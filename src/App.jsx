@@ -170,17 +170,22 @@ async function fetchChapter(reference, translation) {
   const parsed = parseReference(reference);
   if (!parsed) throw new Error("Invalid chapter reference.");
 
-  const url = `https://bible-api.com/data/${translation}/${parsed.bookId}/${parsed.chapter}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to load chapter (${response.status}).`);
-  }
-  const data = await response.json();
+  if (translation === "CUV"){
+    return "haha";
+  } else {
+    const url = `https://bible-api.com/data/${translation}/${parsed.bookId}/${parsed.chapter}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load chapter (${response.status}).`);
+    }
+    const data = await response.json();
 
-  return {
-    translationName: data?.translation?.name || translation.toUpperCase(),
-    verses: Array.isArray(data?.verses) ? data.verses : [],
-  };
+    return {
+      translationName: data?.translation?.name || translation.toUpperCase(),
+      verses: Array.isArray(data?.verses) ? data.verses : [],
+    };
+  }
+  
 }
 
 function Card({ children, className = "" }) {
@@ -491,7 +496,7 @@ export default function App() {
               />
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="grid gap-6 lg:grid-cols-[repeat(auto-fit,minmax(250px,1fr))]">
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-3">
@@ -784,7 +789,7 @@ export default function App() {
                 <div className="text-xl font-semibold text-slate-900">Book-by-book progress</div>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-6">
                   {planBooks.map((book) => {
                     const readCount = progress[book.name].filter(Boolean).length;
                     const pct = Math.round((readCount / book.chapters) * 100);

@@ -1,0 +1,16 @@
+{
+  "profile": {
+    "name": "Bible Reader",
+    "email": "reader@example.com",
+    "goal": "Read every day"
+  },
+  "readingPlan": {
+    "selectedPlan": "whole-bible",
+    "search": "",
+    "days": "365",
+    "activeReference": "Genesis 1",
+    "mainPage": "reader",
+    "translation": "web"
+  },
+  "updatedAt": "2026-03-29T02:51:23.894Z"
+}
