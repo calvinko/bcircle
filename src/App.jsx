@@ -21,12 +21,29 @@ const newTestament = bibleBooks.slice(39);
 const STORAGE_KEY = "bible-reading-progress-v6";
 const SETTINGS_KEY = "bible-reading-settings-v5";
 const PROFILE_KEY = "bible-reading-profile-v4";
+const API_BASE = "/api";
+
+const DEFAULT_SETTINGS = {
+  selectedPlan: "whole-bible",
+  search: "",
+  days: "365",
+  activeReference: "Genesis 1",
+  mainPage: "reader",
+  translation: "web",
+};
+
+const DEFAULT_PROFILE = {
+  name: "Bible Reader",
+  email: "reader@example.com",
+  goal: "Read every day",
+};
 
 const translations = [
   { id: "web", label: "World English Bible (WEB)" },
   { id: "kjv", label: "King James Version (KJV)" },
   { id: "asv", label: "American Standard Version (ASV)" },
   { id: "bbe", label: "Bible in Basic English (BBE)" },
+  { id: "cuv", label: "Chinese Union Version (CUV)" },
 ];
 
 const allChapters = bibleBooks.flatMap((book) =>
@@ -69,46 +86,20 @@ function loadProgress() {
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) {
-      return {
-        selectedPlan: "whole-bible",
-        search: "",
-        days: "365",
-        activeReference: "Genesis 1",
-        mainPage: "reader",
-        translation: "web",
-      };
-    }
-    return JSON.parse(raw);
+    if (!raw) return DEFAULT_SETTINGS;
+    return normalizeSettings(JSON.parse(raw));
   } catch {
-    return {
-      selectedPlan: "whole-bible",
-      search: "",
-      days: "365",
-      activeReference: "Genesis 1",
-      mainPage: "reader",
-      translation: "web",
-    };
+    return DEFAULT_SETTINGS;
   }
 }
 
 function loadProfile() {
   try {
     const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) {
-      return {
-        name: "Bible Reader",
-        email: "reader@example.com",
-        goal: "Read every day",
-      };
-    }
-    return JSON.parse(raw);
+    if (!raw) return DEFAULT_PROFILE;
+    return normalizeProfile(JSON.parse(raw));
   } catch {
-    return {
-      name: "Bible Reader",
-      email: "reader@example.com",
-      goal: "Read every day",
-    };
+    return DEFAULT_PROFILE;
   }
 }
 
@@ -122,6 +113,61 @@ function saveSettings(settings) {
 
 function saveProfile(profile) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
+function normalizeSettings(settings = {}) {
+  return {
+    selectedPlan:
+      typeof settings.selectedPlan === "string"
+        ? settings.selectedPlan
+        : DEFAULT_SETTINGS.selectedPlan,
+    search: typeof settings.search === "string" ? settings.search : DEFAULT_SETTINGS.search,
+    days: typeof settings.days === "string" ? settings.days : DEFAULT_SETTINGS.days,
+    activeReference:
+      typeof settings.activeReference === "string"
+        ? settings.activeReference
+        : DEFAULT_SETTINGS.activeReference,
+    mainPage:
+      typeof settings.mainPage === "string"
+        ? settings.mainPage
+        : DEFAULT_SETTINGS.mainPage,
+    translation:
+      typeof settings.translation === "string"
+        ? settings.translation
+        : DEFAULT_SETTINGS.translation,
+  };
+}
+
+function normalizeProfile(profile = {}) {
+  return {
+    name: typeof profile.name === "string" ? profile.name : DEFAULT_PROFILE.name,
+    email: typeof profile.email === "string" ? profile.email : DEFAULT_PROFILE.email,
+    goal: typeof profile.goal === "string" ? profile.goal : DEFAULT_PROFILE.goal,
+  };
+}
+
+async function fetchStoredUserData() {
+  const response = await fetch(`${API_BASE}/user-profile`);
+  if (!response.ok) {
+    throw new Error(`Failed to load stored user data (${response.status}).`);
+  }
+  return response.json();
+}
+
+async function saveStoredUserData(payload) {
+  const response = await fetch(`${API_BASE}/user-profile`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to save stored user data (${response.status}).`);
+  }
+
+  return response.json();
 }
 
 function getPlanBooks(selectedPlan) {
@@ -310,14 +356,110 @@ export default function App() {
   const [chapterData, setChapterData] = useState({ verses: [], translationName: "" });
   const [loadingChapter, setLoadingChapter] = useState(false);
   const [chapterError, setChapterError] = useState("");
+  const [remoteReady, setRemoteReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState({
+    state: "connecting",
+    message: "Connecting to backend storage...",
+    updatedAt: "",
+  });
+
+  const settings = useMemo(
+    () =>
+      normalizeSettings({
+        search,
+        selectedPlan,
+        days,
+        activeReference,
+        mainPage,
+        translation,
+      }),
+    [search, selectedPlan, days, activeReference, mainPage, translation]
+  );
 
   useEffect(() => {
-    saveSettings({ search, selectedPlan, days, activeReference, mainPage, translation });
-  }, [search, selectedPlan, days, activeReference, mainPage, translation]);
+    saveSettings(settings);
+  }, [settings]);
 
   useEffect(() => {
-    saveProfile(profile);
+    saveProfile(normalizeProfile(profile));
   }, [profile]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateFromBackend() {
+      try {
+        const data = await fetchStoredUserData();
+        if (cancelled) return;
+
+        const nextSettings = normalizeSettings(data.readingPlan);
+        const nextProfile = normalizeProfile(data.profile);
+
+        setSearch(nextSettings.search);
+        setSelectedPlan(nextSettings.selectedPlan);
+        setDays(nextSettings.days);
+        setActiveReference(nextSettings.activeReference);
+        setMainPage(nextSettings.mainPage);
+        setTranslation(nextSettings.translation);
+        setProfile(nextProfile);
+        saveSettings(nextSettings);
+        saveProfile(nextProfile);
+        setSyncStatus({
+          state: "connected",
+          message: "Profile and reading plan are loading from backend storage.",
+          updatedAt: data.updatedAt || "",
+        });
+      } catch {
+        if (cancelled) return;
+        setSyncStatus({
+          state: "offline",
+          message: "Backend unavailable. Using local storage on this device.",
+          updatedAt: "",
+        });
+      } finally {
+        if (!cancelled) setRemoteReady(true);
+      }
+    }
+
+    hydrateFromBackend();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!remoteReady) return;
+
+    const payload = {
+      profile: normalizeProfile(profile),
+      readingPlan: settings,
+    };
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const data = await saveStoredUserData(payload);
+        if (cancelled) return;
+        setSyncStatus({
+          state: "connected",
+          message: "Profile and reading plan are saved to backend storage.",
+          updatedAt: data.updatedAt || "",
+        });
+      } catch {
+        if (cancelled) return;
+        setSyncStatus({
+          state: "offline",
+          message: "Could not reach backend. Latest changes remain in local storage.",
+          updatedAt: "",
+        });
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [profile, settings, remoteReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -862,6 +1004,22 @@ export default function App() {
                   <div className="rounded-3xl border border-slate-200 bg-white p-4">
                     <div className="text-sm text-slate-500">Current chapter</div>
                     <div className="mt-1 text-lg font-semibold text-slate-900">{activeReference}</div>
+                  </div>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm text-slate-500">Backend sync</div>
+                      <Badge active={syncStatus.state === "connected"}>
+                        {syncStatus.state === "connected" ? "Connected" : "Offline"}
+                      </Badge>
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900">
+                      {syncStatus.message}
+                    </div>
+                    {syncStatus.updatedAt ? (
+                      <div className="mt-2 text-sm text-slate-500">
+                        Last saved: {new Date(syncStatus.updatedAt).toLocaleString()}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="rounded-3xl border border-slate-200 bg-white p-4">
                     <div className="text-sm text-slate-500">Reading summary</div>
