@@ -503,7 +503,6 @@ export default function App() {
     loadedSettings.additionalTranslation || "kjv"
   );
   const [profile, setProfile] = useState(loadProfile);
-  const [readerTab, setReaderTab] = useState("books");
   const [chapterData, setChapterData] = useState({ verses: [], translationName: "" });
   const [loadingChapter, setLoadingChapter] = useState(false);
   const [chapterError, setChapterError] = useState("");
@@ -528,6 +527,7 @@ export default function App() {
   const [savedSettings, setSavedSettings] = useState(() => normalizeSettings(loadSettings()));
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
+  const [showDailyPlan, setShowDailyPlan] = useState(false);
   const [syncStatus, setSyncStatus] = useState({
     state: "connecting",
     message: "Connecting to backend storage...",
@@ -772,11 +772,6 @@ export default function App() {
   }, [planBooks, progress]);
 
   const dailyPlan = useMemo(() => buildDailyPlan(selectedPlan, days), [selectedPlan, days]);
-
-  const nextUnread = useMemo(() => {
-    const chapters = getChaptersForPlan(selectedPlan);
-    return chapters.find((item) => !progress[item.book][item.chapter - 1]) || null;
-  }, [progress, selectedPlan]);
 
   const todayPlan = useMemo(() => {
     const chapters = getChaptersForPlan(selectedPlan);
@@ -1074,17 +1069,6 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard title="Plan progress" value={`${stats.percent}%`} progressValue={stats.percent} />
-              <StatCard title="Read chapters" value={stats.readChapters} subtitle={`of ${stats.totalChapters} chapters`} />
-              <StatCard title="Completed books" value={stats.completedBooks} subtitle={`of ${stats.totalBooks} books`} />
-              <StatCard
-                title="Next chapter"
-                value={nextUnread ? nextUnread.label : "Plan complete"}
-                subtitle={nextUnread ? "Your next unread chapter" : "You finished this plan"}
-              />
-            </div>
-
             <div className="grid gap-6 lg:grid-cols-[repeat(auto-fit,minmax(250px,1fr))]">
               <Card>
                 <CardHeader>
@@ -1259,21 +1243,26 @@ export default function App() {
               )}
             </div>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="flex gap-2 rounded-3xl bg-slate-100 p-1">
-                    <TabButton active={readerTab === "books"} onClick={() => setReaderTab("books")}>
-                      Books
-                    </TabButton>
-                    <TabButton
-                      active={readerTab === "daily-plan"}
-                      onClick={() => setReaderTab("daily-plan")}
-                    >
-                      Daily plan
-                    </TabButton>
-                  </div>
+          </motion.div>
+        )}
 
+        {mainPage === "progress" && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard title="Overall progress" value={`${stats.percent}%`} progressValue={stats.percent} />
+              <StatCard title="Chapters read" value={stats.readChapters} subtitle="Tracked in this plan" />
+              <StatCard title="Books completed" value={stats.completedBooks} subtitle="Finished from start to end" />
+              <StatCard title="Plan length" value={days} subtitle="days selected" />
+            </div>
+
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="text-xl font-semibold text-slate-900">Book-by-book progress</div>
                   <div className="relative w-full md:w-80">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <TextInput
@@ -1284,83 +1273,95 @@ export default function App() {
                     />
                   </div>
                 </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4">
+                  {filteredBooks.map((book) => {
+                    const readCount = progress[book.name].filter(Boolean).length;
+                    const pct = Math.round((readCount / book.chapters) * 100);
+                    const done = readCount === book.chapters;
+                    return (
+                      <Card key={book.name} className="border-slate-200 shadow-none">
+                        <CardHeader className="space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-xl font-semibold text-slate-900">
+                                {book.name}
+                              </div>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {readCount} / {book.chapters} chapters read
+                              </p>
+                            </div>
+                            {done ? <Badge active>Completed</Badge> : <Badge>{pct}%</Badge>}
+                          </div>
+                          <ProgressBar value={pct} />
+                          <div className="flex flex-wrap gap-2">
+                            <PrimaryButton
+                              variant="outline"
+                              className="text-xs"
+                              onClick={() => markBook(book.name, true)}
+                            >
+                              Mark all read
+                            </PrimaryButton>
+                            <PrimaryButton
+                              variant="ghost"
+                              className="text-xs"
+                              onClick={() => markBook(book.name, false)}
+                            >
+                              Clear
+                            </PrimaryButton>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8">
+                            {progress[book.name].map((isRead, index) => (
+                              <label
+                                key={`${book.name}-${index + 1}`}
+                                className={`flex cursor-pointer items-center gap-2 rounded-2xl border p-2 text-sm transition hover:shadow-sm ${
+                                  isRead
+                                    ? "border-slate-300 bg-slate-100"
+                                    : "border-slate-200 bg-white"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isRead}
+                                  onChange={() => toggleChapter(book.name, index)}
+                                  className="h-4 w-4 rounded border-slate-300"
+                                />
+                                <span onClick={() => setActiveReference(`${book.name} ${index + 1}`)}>
+                                  {index + 1}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
 
-                {readerTab === "books" && (
-                  <div className="mt-4 max-h-[60vh] overflow-y-auto pr-1">
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      {filteredBooks.map((book) => {
-                        const readCount = progress[book.name].filter(Boolean).length;
-                        const done = readCount === book.chapters;
-                        return (
-                          <Card key={book.name} className="border-slate-200 shadow-none">
-                            <CardHeader className="space-y-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <div className="text-xl font-semibold text-slate-900">
-                                    {book.name}
-                                  </div>
-                                  <p className="mt-1 text-sm text-slate-500">
-                                    {readCount} / {book.chapters} chapters read
-                                  </p>
-                                </div>
-                                {done && <Badge active>Completed</Badge>}
-                              </div>
-                              <ProgressBar value={(readCount / book.chapters) * 100} />
-                              <div className="flex flex-wrap gap-2">
-                                <PrimaryButton
-                                  variant="outline"
-                                  className="text-xs"
-                                  onClick={() => markBook(book.name, true)}
-                                >
-                                  Mark all read
-                                </PrimaryButton>
-                                <PrimaryButton
-                                  variant="ghost"
-                                  className="text-xs"
-                                  onClick={() => markBook(book.name, false)}
-                                >
-                                  Clear
-                                </PrimaryButton>
-                              </div>
-                            </CardHeader>
-
-                            <CardContent>
-                              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8">
-                                {progress[book.name].map((isRead, index) => (
-                                  <label
-                                    key={`${book.name}-${index + 1}`}
-                                    className={`flex cursor-pointer items-center gap-2 rounded-2xl border p-2 text-sm transition hover:shadow-sm ${
-                                      isRead
-                                        ? "border-slate-300 bg-slate-100"
-                                        : "border-slate-200 bg-white"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isRead}
-                                      onChange={() => toggleChapter(book.name, index)}
-                                      className="h-4 w-4 rounded border-slate-300"
-                                    />
-                                    <span
-                                      onClick={() =>
-                                        setActiveReference(`${book.name} ${index + 1}`)
-                                      }
-                                    >
-                                      {index + 1}
-                                    </span>
-                                  </label>
-                                ))}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+                    <ListChecks className="h-5 w-5" />
+                    Daily plan
                   </div>
-                )}
-
-                {readerTab === "daily-plan" && (
-                  <div className="mt-4 max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowDailyPlan((current) => !current)}
+                    className="rounded-full border border-slate-200 px-3 py-1 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                  >
+                    {showDailyPlan ? "Hide details" : "Show details"}
+                  </button>
+                </div>
+              </CardHeader>
+              {showDailyPlan ? (
+                <CardContent className="space-y-3">
+                  <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
                     {dailyPlan.map((item) => {
                       const doneCount = item.chapters.filter(
                         (chapter) => progress[chapter.book][chapter.chapter - 1]
@@ -1370,7 +1371,7 @@ export default function App() {
                         <Card key={item.day} className="border-slate-200 shadow-none">
                           <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 <ListChecks className="h-4 w-4 text-slate-600" />
                                 <span className="font-semibold text-slate-900">Day {item.day}</span>
                                 {done ? <Badge active>Done</Badge> : null}
@@ -1390,51 +1391,8 @@ export default function App() {
                       );
                     })}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {mainPage === "progress" && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard title="Overall progress" value={`${stats.percent}%`} progressValue={stats.percent} />
-              <StatCard title="Chapters read" value={stats.readChapters} subtitle="Tracked in this plan" />
-              <StatCard title="Books completed" value={stats.completedBooks} subtitle="Finished from start to end" />
-              <StatCard title="Plan length" value={days} subtitle="days selected" />
-            </div>
-
-            <Card>
-              <CardHeader>
-                <div className="text-xl font-semibold text-slate-900">Book-by-book progress</div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-6">
-                  {planBooks.map((book) => {
-                    const readCount = progress[book.name].filter(Boolean).length;
-                    const pct = Math.round((readCount / book.chapters) * 100);
-                    return (
-                      <div key={book.name} className="rounded-3xl border border-slate-200 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="font-semibold text-slate-900">{book.name}</div>
-                            <div className="text-sm text-slate-500">
-                              {readCount} of {book.chapters} chapters
-                            </div>
-                          </div>
-                          <Badge active={pct === 100}>{pct}%</Badge>
-                        </div>
-                        <ProgressBar value={pct} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
+                </CardContent>
+              ) : null}
             </Card>
           </motion.div>
         )}
