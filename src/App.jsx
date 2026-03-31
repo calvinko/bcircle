@@ -501,7 +501,7 @@ export default function App() {
     loadedSettings.readerFontSize ?? DEFAULT_SETTINGS.readerFontSize
   );
   const [showTodaysReading, setShowTodaysReading] = useState(
-    loadedSettings.showTodaysReading ?? true
+    loadedSettings.showTodaysReading ?? false
   );
   const [showAdditionalReader, setShowAdditionalReader] = useState(
     loadedSettings.showAdditionalReader ?? false
@@ -959,26 +959,25 @@ export default function App() {
     }
   };
 
-  const handleSaveReadingPlan = async () => {
-    saveSettings(settings);
+  const persistReadingPlan = async (nextSettings, successMessage) => {
+    saveSettings(nextSettings);
 
     if (!authToken) {
-      setSavedSettings(settings);
+      setSavedSettings(nextSettings);
       setSyncStatus({
         state: "offline",
         message: "Reading plan saved on this device. Sign in to save it to your account.",
         updatedAt: "",
       });
-      return;
+      return nextSettings;
     }
 
-    setSavingPlan(true);
     try {
       const data = await saveStoredUserData(
         {
           progress: normalizeProgress(progress),
           profile: savedProfile,
-          readingPlan: settings,
+          readingPlan: nextSettings,
         },
         authToken
       );
@@ -987,26 +986,49 @@ export default function App() {
       saveSettings(normalizedSavedSettings);
       setSyncStatus({
         state: "connected",
-        message: "Reading plan saved to your account.",
+        message: successMessage,
         updatedAt: data.updatedAt || "",
       });
+      return normalizedSavedSettings;
     } catch {
       setSyncStatus({
         state: "offline",
         message: "Could not save your reading plan to the backend.",
         updatedAt: "",
       });
+      return nextSettings;
+    }
+  };
+
+  const handleSaveReadingPlan = async () => {
+    setSavingPlan(true);
+    try {
+      await persistReadingPlan(settings, "Reading plan saved to your account.");
     } finally {
       setSavingPlan(false);
     }
   };
 
+  const updateReaderFontSize = async (delta) => {
+    const nextValue = Math.max(12, Math.min(24, readerFontSize + delta));
+    if (nextValue === readerFontSize) return;
+
+    const nextSettings = normalizeSettings({
+      ...settings,
+      readerFontSize: nextValue,
+    });
+
+    setReaderFontSize(nextValue);
+    setSavedSettings(nextSettings);
+    await persistReadingPlan(nextSettings, "Reader font size saved to your account.");
+  };
+
   const decreaseReaderFontSize = () => {
-    setReaderFontSize((value) => Math.max(12, value - 1));
+    void updateReaderFontSize(-1);
   };
 
   const increaseReaderFontSize = () => {
-    setReaderFontSize((value) => Math.min(24, value + 1));
+    void updateReaderFontSize(1);
   };
 
   const goToAdjacentChapter = (direction) => {
