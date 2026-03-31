@@ -250,6 +250,8 @@ app.use((req, res, next) => {
 
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', "https://biblecircle.vercel.app");
   }
 
   next();
