@@ -20,7 +20,9 @@ const newTestament = bibleBooks.slice(39);
 const STORAGE_KEY = "bible-reading-progress-v6";
 const SETTINGS_KEY = "bible-reading-settings-v5";
 const PROFILE_KEY = "bible-reading-profile-v4";
-const API_BASE = "https://biblecircle.org/app/api";   
+const AUTH_TOKEN_KEY = "bible-reading-auth-token-v1";
+const AUTH_USER_KEY = "bible-reading-auth-user-v1";
+const API_BASE = "https://biblecircle.org/app/api";
 
 
 
@@ -109,6 +111,40 @@ function saveProfile(profile) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
 }
 
+function loadAuthToken() {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveAuthToken(token) {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+function clearAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+function loadAuthUser() {
+  try {
+    const raw = localStorage.getItem(AUTH_USER_KEY);
+    if (!raw) return null;
+    return normalizeAuthUser(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function saveAuthUser(user) {
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+}
+
+function clearAuthUser() {
+  localStorage.removeItem(AUTH_USER_KEY);
+}
+
 function normalizeProgress(progress = {}) {
   const fallback = makeInitialProgress();
   for (const book of bibleBooks) {
@@ -165,19 +201,32 @@ function normalizeProfile(profile = {}) {
   };
 }
 
-async function fetchStoredUserData() {
-  const response = await fetch(`${API_BASE}/user-profile`);
+function normalizeAuthUser(user = {}) {
+  if (!user || typeof user !== "object") return null;
+  return {
+    userUuid: typeof user.userUuid === "string" ? user.userUuid : "",
+    email: typeof user.email === "string" ? user.email : "",
+  };
+}
+
+async function fetchStoredUserData(token) {
+  const response = await fetch(`${API_BASE}/user-profile`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
   if (!response.ok) {
     throw new Error(`Failed to load stored user data (${response.status}).`);
   }
   return response.json();
 }
 
-async function saveStoredUserData(payload) {
+async function saveStoredUserData(payload, token) {
   const response = await fetch(`${API_BASE}/user-profile`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(payload),
   });
@@ -187,6 +236,38 @@ async function saveStoredUserData(payload) {
   }
 
   return response.json();
+}
+
+async function registerUser({ displayName, email, password }) {
+  const response = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ displayName, email, password }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `Failed to register (${response.status}).`);
+  }
+  return data;
+}
+
+async function loginUser({ email, password }) {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `Failed to sign in (${response.status}).`);
+  }
+  return data;
 }
 
 function getPlanBooks(selectedPlan) {
@@ -422,6 +503,16 @@ export default function App() {
   });
   const [loadingAdditionalChapter, setLoadingAdditionalChapter] = useState(false);
   const [additionalChapterError, setAdditionalChapterError] = useState("");
+  const [authToken, setAuthToken] = useState(loadAuthToken);
+  const [currentUser, setCurrentUser] = useState(loadAuthUser);
+  const [authMode, setAuthMode] = useState("signin");
+  const [authForm, setAuthForm] = useState({
+    displayName: "",
+    email: "",
+    password: "",
+  });
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [remoteReady, setRemoteReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState({
     state: "connecting",
@@ -464,11 +555,39 @@ export default function App() {
   }, [profile]);
 
   useEffect(() => {
+    if (authToken) {
+      saveAuthToken(authToken);
+    } else {
+      clearAuthToken();
+    }
+  }, [authToken]);
+
+  useEffect(() => {
+    if (currentUser) {
+      saveAuthUser(currentUser);
+    } else {
+      clearAuthUser();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function hydrateFromBackend() {
+      if (!authToken) {
+        if (!cancelled) {
+          setRemoteReady(true);
+          setSyncStatus({
+            state: "offline",
+            message: "Signed out. Data is only stored on this device until you sign in.",
+            updatedAt: "",
+          });
+        }
+        return;
+      }
+
       try {
-        const data = await fetchStoredUserData();
+        const data = await fetchStoredUserData(authToken);
         if (cancelled) return;
 
         const nextProgress = normalizeProgress(data.progress);
@@ -486,19 +605,26 @@ export default function App() {
         setShowAdditionalReader(nextSettings.showAdditionalReader);
         setAdditionalTranslation(nextSettings.additionalTranslation);
         setProfile(nextProfile);
+        setCurrentUser((prev) => prev || normalizeAuthUser({ email: nextProfile.email }));
         saveProgress(nextProgress);
         saveSettings(nextSettings);
         saveProfile(nextProfile);
         setSyncStatus({
           state: "connected",
-          message: "Profile, reading plan, and progress are loading from backend storage.",
+          message: "Signed in. Profile, reading plan, and progress are syncing.",
           updatedAt: data.updatedAt || "",
         });
-      } catch {
+      } catch (error) {
         if (cancelled) return;
+        if (String(error.message || "").includes("(401)")) {
+          clearAuthToken();
+          clearAuthUser();
+          setAuthToken("");
+          setCurrentUser(null);
+        }
         setSyncStatus({
           state: "offline",
-          message: "Backend unavailable. Using local storage on this device.",
+          message: "Could not load your account data. Using local device storage.",
           updatedAt: "",
         });
       } finally {
@@ -506,14 +632,17 @@ export default function App() {
       }
     }
 
+    setRemoteReady(false);
     hydrateFromBackend();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authToken]);
 
   useEffect(() => {
+    let cancelled = false;
     if (!remoteReady) return;
+    if (!authToken) return;
 
     const payload = {
       progress: normalizeProgress(progress),
@@ -521,10 +650,9 @@ export default function App() {
       readingPlan: settings,
     };
 
-    let cancelled = false;
     const timeoutId = window.setTimeout(async () => {
       try {
-        const data = await saveStoredUserData(payload);
+        const data = await saveStoredUserData(payload, authToken);
         if (cancelled) return;
         setSyncStatus({
           state: "connected",
@@ -535,7 +663,7 @@ export default function App() {
         if (cancelled) return;
         setSyncStatus({
           state: "offline",
-          message: "Could not reach backend. Latest changes remain in local storage.",
+          message: "Could not reach backend. Latest changes remain on this device.",
           updatedAt: "",
         });
       }
@@ -545,7 +673,7 @@ export default function App() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [progress, profile, settings, remoteReady]);
+  }, [authToken, progress, profile, settings, remoteReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -679,6 +807,85 @@ export default function App() {
       saveProgress(next);
       return next;
     });
+  };
+
+  const handleAuthFieldChange = (field, value) => {
+    setAuthForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const resetGuestState = () => {
+    const nextProgress = makeInitialProgress();
+    setProgress(nextProgress);
+    setSearch(DEFAULT_SETTINGS.search);
+    setSelectedPlan(DEFAULT_SETTINGS.selectedPlan);
+    setDays(DEFAULT_SETTINGS.days);
+    setActiveReference(DEFAULT_SETTINGS.activeReference);
+    setMainPage(DEFAULT_SETTINGS.mainPage);
+    setTranslation(DEFAULT_SETTINGS.translation);
+    setShowTodaysReading(DEFAULT_SETTINGS.showTodaysReading);
+    setShowAdditionalReader(DEFAULT_SETTINGS.showAdditionalReader);
+    setAdditionalTranslation(DEFAULT_SETTINGS.additionalTranslation);
+    setProfile(DEFAULT_PROFILE);
+    saveProgress(nextProgress);
+    saveSettings(DEFAULT_SETTINGS);
+    saveProfile(DEFAULT_PROFILE);
+  };
+
+  const handleAuthSuccess = ({ token, user }) => {
+    const nextUser = normalizeAuthUser(user);
+    setAuthToken(token);
+    setCurrentUser(nextUser);
+    saveAuthToken(token);
+    if (nextUser) saveAuthUser(nextUser);
+    setAuthError("");
+    setAuthForm((prev) => ({ ...prev, password: "" }));
+    setSyncStatus({
+      state: "connecting",
+      message: "Loading your account data...",
+      updatedAt: "",
+    });
+  };
+
+  const handleSignOut = () => {
+    clearAuthToken();
+    clearAuthUser();
+    setAuthToken("");
+    setCurrentUser(null);
+    setAuthError("");
+    setAuthForm({ displayName: "", email: "", password: "" });
+    resetGuestState();
+    setSyncStatus({
+      state: "offline",
+      message: "Signed out. Data is only stored on this device until you sign in.",
+      updatedAt: "",
+    });
+  };
+
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+    setAuthSubmitting(true);
+    setAuthError("");
+
+    try {
+      if (authMode === "register") {
+        const result = await registerUser({
+          displayName: authForm.displayName,
+          email: authForm.email,
+          password: authForm.password,
+        });
+        handleAuthSuccess(result);
+      } else {
+        const result = await loginUser({
+          email: authForm.email,
+          password: authForm.password,
+        });
+        handleAuthSuccess(result);
+      }
+    } catch (error) {
+      setAuthError(error.message || "Authentication failed.");
+    } finally {
+      setAuthSubmitting(false);
+    }
   };
 
   const goToAdjacentChapter = (direction) => {
@@ -993,9 +1200,6 @@ export default function App() {
                                       type="checkbox"
                                       checked={isRead}
                                       onChange={() => toggleChapter(book.name, index)}
-                                      onClick={() =>
-                                        setActiveReference(`${book.name} ${index + 1}`)
-                                      }
                                       className="h-4 w-4 rounded border-slate-300"
                                     />
                                     <span
@@ -1102,6 +1306,97 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+                  <User className="h-5 w-5" />
+                  Account
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!authToken ? (
+                  <>
+                    <div className="flex gap-2 rounded-3xl bg-slate-100 p-1">
+                      <TabButton active={authMode === "signin"} onClick={() => setAuthMode("signin")}>
+                        Sign in
+                      </TabButton>
+                      <TabButton
+                        active={authMode === "register"}
+                        onClick={() => setAuthMode("register")}
+                      >
+                        Register
+                      </TabButton>
+                    </div>
+
+                    <form onSubmit={handleAuthSubmit} className="grid gap-4 lg:grid-cols-2">
+                      {authMode === "register" ? (
+                        <div>
+                          <p className="mb-2 text-sm font-medium text-slate-700">Display name</p>
+                          <TextInput
+                            value={authForm.displayName}
+                            onChange={(e) => handleAuthFieldChange("displayName", e.target.value)}
+                            placeholder="Bible Reader"
+                          />
+                        </div>
+                      ) : null}
+                      <div>
+                        <p className="mb-2 text-sm font-medium text-slate-700">Email</p>
+                        <TextInput
+                          type="email"
+                          value={authForm.email}
+                          onChange={(e) => handleAuthFieldChange("email", e.target.value)}
+                          placeholder="reader@example.com"
+                        />
+                      </div>
+                      <div>
+                        <p className="mb-2 text-sm font-medium text-slate-700">Password</p>
+                        <TextInput
+                          type="password"
+                          value={authForm.password}
+                          onChange={(e) => handleAuthFieldChange("password", e.target.value)}
+                          placeholder="At least 8 characters"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <PrimaryButton type="submit" className="w-full" disabled={authSubmitting}>
+                          {authSubmitting
+                            ? authMode === "register"
+                              ? "Creating account..."
+                              : "Signing in..."
+                            : authMode === "register"
+                              ? "Create account"
+                              : "Sign in"}
+                        </PrimaryButton>
+                      </div>
+                    </form>
+
+                    {authError ? <div className="text-sm text-red-600">{authError}</div> : null}
+
+                    <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                      Sign in to keep your reading progress, plan, and profile separate for each user.
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                      <div className="text-sm text-slate-500">Signed in as</div>
+                      <div className="mt-1 text-lg font-semibold text-slate-900">
+                        {currentUser?.email || profile.email}
+                      </div>
+                      <div className="mt-2 text-sm text-slate-500">
+                        Your reading data now syncs per account.
+                      </div>
+                    </div>
+                    <div className="flex items-end">
+                      <PrimaryButton variant="outline" className="w-full lg:w-auto" onClick={handleSignOut}>
+                        Sign out
+                      </PrimaryButton>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">

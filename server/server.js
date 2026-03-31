@@ -119,8 +119,9 @@ function normalizeProgress(progress = {}) {
 
 async function ensureStoredUserDataTable() {
   await pool.execute(`
-    CREATE TABLE IF NOT EXISTS app_user_profile_storage (
-      id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS app_user_state_storage (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL,
       name VARCHAR(100) NULL,
       email VARCHAR(255) NULL,
       goal VARCHAR(255) NULL,
@@ -135,17 +136,23 @@ async function ensureStoredUserDataTable() {
       additional_translation VARCHAR(20) NULL,
       progress_json JSON NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_app_user_state_storage_user_id (user_id),
+      CONSTRAINT fk_app_user_state_storage_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE
     ) ENGINE=InnoDB
   `);
 }
 
-async function readStoredUserData() {
+async function readStoredUserData(userId, fallbackEmail = DEFAULT_PROFILE.email) {
   await ensureStoredUserDataTable();
 
   const [rows] = await pool.execute(
     `
     SELECT
+      s.user_id,
       name,
       email,
       goal,
@@ -160,14 +167,19 @@ async function readStoredUserData() {
       additional_translation,
       progress_json,
       updated_at
-    FROM app_user_profile_storage
-    WHERE id = 1
+    FROM app_user_state_storage s
+    WHERE s.user_id = ?
     LIMIT 1
-    `
+    `,
+    [userId]
   );
 
   if (rows.length === 0) {
-    return normalizeStoredUserData({});
+    return normalizeStoredUserData({
+      profile: {
+        email: fallbackEmail
+      }
+    });
   }
 
   const row = rows[0];
@@ -197,15 +209,21 @@ async function readStoredUserData() {
   });
 }
 
-async function writeStoredUserData(payload) {
+async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROFILE.email) {
   await ensureStoredUserDataTable();
 
-  const normalized = normalizeStoredUserData(payload);
+  const normalized = normalizeStoredUserData({
+    ...payload,
+    profile: {
+      ...payload?.profile,
+      email: payload?.profile?.email || fallbackEmail
+    }
+  });
 
   await pool.execute(
     `
-    INSERT INTO app_user_profile_storage (
-      id,
+    INSERT INTO app_user_state_storage (
+      user_id,
       name,
       email,
       goal,
@@ -237,7 +255,7 @@ async function writeStoredUserData(payload) {
       progress_json = VALUES(progress_json)
     `,
     [
-      1,
+      userId,
       normalized.profile.name,
       normalized.profile.email,
       normalized.profile.goal,
@@ -254,7 +272,7 @@ async function writeStoredUserData(payload) {
     ]
   );
 
-  return readStoredUserData();
+  return readStoredUserData(userId, fallbackEmail);
 }
 
 app.use((req, res, next) => {
@@ -292,9 +310,9 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-app.get('/api/user-profile', async (_req, res) => {
+app.get('/api/user-profile', requireAuth, async (req, res) => {
   try {
-    const data = await readStoredUserData();
+    const data = await readStoredUserData(req.auth.userId, req.auth.email);
     res.json(data);
   } catch (error) {
     console.error('Get stored user profile failed:', error);
@@ -302,9 +320,9 @@ app.get('/api/user-profile', async (_req, res) => {
   }
 });
 
-app.put('/api/user-profile', async (req, res) => {
+app.put('/api/user-profile', requireAuth, async (req, res) => {
   try {
-    const saved = await writeStoredUserData(req.body ?? {});
+    const saved = await writeStoredUserData(req.auth.userId, req.body ?? {}, req.auth.email);
     res.json(saved);
   } catch (error) {
     console.error('Update stored user profile failed:', error);
@@ -313,6 +331,7 @@ app.put('/api/user-profile', async (req, res) => {
 });
 
 app.post('/api/auth/register', async (req, res) => {
+  await ensureStoredUserDataTable();
   const connection = await pool.getConnection();
 
   try {
@@ -346,6 +365,44 @@ app.post('/api/auth/register', async (req, res) => {
       VALUES (?, ?, NULL, NULL, NULL)
       `,
       [userResult.insertId, displayName ?? null]
+    );
+
+    await connection.execute(
+      `
+      INSERT INTO app_user_state_storage (
+        user_id,
+        name,
+        email,
+        goal,
+        selected_plan,
+        search,
+        days,
+        active_reference,
+        main_page,
+        translation,
+        show_todays_reading,
+        show_additional_reader,
+        additional_translation,
+        progress_json
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        userResult.insertId,
+        displayName ?? DEFAULT_PROFILE.name,
+        normalizedEmail,
+        DEFAULT_PROFILE.goal,
+        DEFAULT_READING_PLAN.selectedPlan,
+        DEFAULT_READING_PLAN.search,
+        DEFAULT_READING_PLAN.days,
+        DEFAULT_READING_PLAN.activeReference,
+        DEFAULT_READING_PLAN.mainPage,
+        DEFAULT_READING_PLAN.translation,
+        DEFAULT_READING_PLAN.showTodaysReading,
+        DEFAULT_READING_PLAN.showAdditionalReader,
+        DEFAULT_READING_PLAN.additionalTranslation,
+        JSON.stringify({})
+      ]
     );
 
     await connection.commit();
