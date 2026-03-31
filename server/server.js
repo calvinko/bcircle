@@ -58,6 +58,13 @@ function normalizeProfile(profile = {}) {
 }
 
 function normalizeReadingPlan(readingPlan = {}) {
+  const parsedReaderFontSize =
+    typeof readingPlan.readerFontSize === 'number'
+      ? readingPlan.readerFontSize
+      : typeof readingPlan.readerFontSize === 'string' && readingPlan.readerFontSize.trim() !== ''
+        ? Number(readingPlan.readerFontSize)
+        : NaN;
+
   return {
     selectedPlan:
       typeof readingPlan.selectedPlan === 'string'
@@ -79,8 +86,8 @@ function normalizeReadingPlan(readingPlan = {}) {
         ? readingPlan.translation
         : DEFAULT_READING_PLAN.translation,
     readerFontSize:
-      typeof readingPlan.readerFontSize === 'number'
-        ? Math.max(12, Math.min(24, readingPlan.readerFontSize))
+      Number.isFinite(parsedReaderFontSize)
+        ? Math.max(12, Math.min(24, parsedReaderFontSize))
         : DEFAULT_READING_PLAN.readerFontSize,
     showTodaysReading:
       typeof readingPlan.showTodaysReading === 'boolean'

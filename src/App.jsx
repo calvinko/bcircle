@@ -159,6 +159,13 @@ function normalizeProgress(progress = {}) {
 }
 
 function normalizeSettings(settings = {}) {
+  const parsedReaderFontSize =
+    typeof settings.readerFontSize === "number"
+      ? settings.readerFontSize
+      : typeof settings.readerFontSize === "string" && settings.readerFontSize.trim() !== ""
+        ? Number(settings.readerFontSize)
+        : NaN;
+
   return {
     selectedPlan:
       typeof settings.selectedPlan === "string"
@@ -179,8 +186,8 @@ function normalizeSettings(settings = {}) {
         ? settings.translation
         : DEFAULT_SETTINGS.translation,
     readerFontSize:
-      typeof settings.readerFontSize === "number"
-        ? Math.max(12, Math.min(24, settings.readerFontSize))
+      Number.isFinite(parsedReaderFontSize)
+        ? Math.max(12, Math.min(24, parsedReaderFontSize))
         : DEFAULT_SETTINGS.readerFontSize,
     showTodaysReading:
       typeof settings.showTodaysReading === "boolean"
@@ -491,7 +498,7 @@ export default function App() {
   const [mainPage, setMainPage] = useState(loadedSettings.mainPage || "reader");
   const [translation, setTranslation] = useState(loadedSettings.translation || "web");
   const [readerFontSize, setReaderFontSize] = useState(
-    loadedSettings.readerFontSize || DEFAULT_SETTINGS.readerFontSize
+    loadedSettings.readerFontSize ?? DEFAULT_SETTINGS.readerFontSize
   );
   const [showTodaysReading, setShowTodaysReading] = useState(
     loadedSettings.showTodaysReading ?? true
@@ -692,7 +699,7 @@ export default function App() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [authToken, progress, profile, settings, remoteReady]);
+  }, [authToken, progress, savedProfile, savedSettings, remoteReady]);
 
   useEffect(() => {
     let cancelled = false;
