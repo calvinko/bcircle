@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import {
   BookOpen,
   CalendarDays,
-  RotateCcw,
   Search,
   ListChecks,
   User,
@@ -30,6 +29,9 @@ const DEFAULT_SETTINGS = {
   activeReference: "Genesis 1",
   mainPage: "reader",
   translation: "web",
+  showTodaysReading: true,
+  showAdditionalReader: false,
+  additionalTranslation: "kjv",
 };
 
 const DEFAULT_PROFILE = {
@@ -135,6 +137,18 @@ function normalizeSettings(settings = {}) {
       typeof settings.translation === "string"
         ? settings.translation
         : DEFAULT_SETTINGS.translation,
+    showTodaysReading:
+      typeof settings.showTodaysReading === "boolean"
+        ? settings.showTodaysReading
+        : DEFAULT_SETTINGS.showTodaysReading,
+    showAdditionalReader:
+      typeof settings.showAdditionalReader === "boolean"
+        ? settings.showAdditionalReader
+        : DEFAULT_SETTINGS.showAdditionalReader,
+    additionalTranslation:
+      typeof settings.additionalTranslation === "string"
+        ? settings.additionalTranslation
+        : DEFAULT_SETTINGS.additionalTranslation,
   };
 }
 
@@ -312,6 +326,38 @@ function ProgressBar({ value }) {
   );
 }
 
+function ChapterTextContent({ loading, error, verses }) {
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+        <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
+        <div className="h-4 w-[92%] animate-pulse rounded bg-slate-200" />
+        <div className="h-4 w-[85%] animate-pulse rounded bg-slate-200" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-sm text-red-600">{error}</div>;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {verses.map((verse) => (
+        <div key={`${verse.book_id}-${verse.chapter}-${verse.verse}`} className="flex gap-3">
+          <div className="min-w-8 pt-0.5 text-right text-xs font-semibold text-slate-500">
+            {verse.verse}
+          </div>
+          <p className="text-sm leading-5 text-slate-700 whitespace-pre-wrap">
+            {verse.text?.trim()}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TabButton({ active, children, ...props }) {
   return (
     <button
@@ -351,11 +397,26 @@ export default function App() {
   const [activeReference, setActiveReference] = useState(loadedSettings.activeReference || "Genesis 1");
   const [mainPage, setMainPage] = useState(loadedSettings.mainPage || "reader");
   const [translation, setTranslation] = useState(loadedSettings.translation || "web");
+  const [showTodaysReading, setShowTodaysReading] = useState(
+    loadedSettings.showTodaysReading ?? true
+  );
+  const [showAdditionalReader, setShowAdditionalReader] = useState(
+    loadedSettings.showAdditionalReader ?? false
+  );
+  const [additionalTranslation, setAdditionalTranslation] = useState(
+    loadedSettings.additionalTranslation || "kjv"
+  );
   const [profile, setProfile] = useState(loadProfile);
   const [readerTab, setReaderTab] = useState("books");
   const [chapterData, setChapterData] = useState({ verses: [], translationName: "" });
   const [loadingChapter, setLoadingChapter] = useState(false);
   const [chapterError, setChapterError] = useState("");
+  const [additionalChapterData, setAdditionalChapterData] = useState({
+    verses: [],
+    translationName: "",
+  });
+  const [loadingAdditionalChapter, setLoadingAdditionalChapter] = useState(false);
+  const [additionalChapterError, setAdditionalChapterError] = useState("");
   const [remoteReady, setRemoteReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState({
     state: "connecting",
@@ -372,8 +433,21 @@ export default function App() {
         activeReference,
         mainPage,
         translation,
+        showTodaysReading,
+        showAdditionalReader,
+        additionalTranslation,
       }),
-    [search, selectedPlan, days, activeReference, mainPage, translation]
+    [
+      search,
+      selectedPlan,
+      days,
+      activeReference,
+      mainPage,
+      translation,
+      showTodaysReading,
+      showAdditionalReader,
+      additionalTranslation,
+    ]
   );
 
   useEffect(() => {
@@ -401,6 +475,9 @@ export default function App() {
         setActiveReference(nextSettings.activeReference);
         setMainPage(nextSettings.mainPage);
         setTranslation(nextSettings.translation);
+        setShowTodaysReading(nextSettings.showTodaysReading);
+        setShowAdditionalReader(nextSettings.showAdditionalReader);
+        setAdditionalTranslation(nextSettings.additionalTranslation);
         setProfile(nextProfile);
         saveSettings(nextSettings);
         saveProfile(nextProfile);
@@ -485,6 +562,33 @@ export default function App() {
       cancelled = true;
     };
   }, [activeReference, translation]);
+
+  useEffect(() => {
+    if (!showAdditionalReader) return;
+
+    let cancelled = false;
+
+    async function loadAdditionalChapter() {
+      try {
+        setLoadingAdditionalChapter(true);
+        setAdditionalChapterError("");
+        const data = await fetchChapter(activeReference, additionalTranslation);
+        if (!cancelled) setAdditionalChapterData(data);
+      } catch (error) {
+        if (!cancelled) {
+          setAdditionalChapterError(error.message || "Unable to load chapter.");
+          setAdditionalChapterData({ verses: [], translationName: "" });
+        }
+      } finally {
+        if (!cancelled) setLoadingAdditionalChapter(false);
+      }
+    }
+
+    loadAdditionalChapter();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeReference, additionalTranslation, showAdditionalReader]);
 
   const planBooks = useMemo(() => getPlanBooks(selectedPlan), [selectedPlan]);
   const filteredBooks = useMemo(
@@ -593,12 +697,6 @@ export default function App() {
     }
   };
 
-  const resetPlan = () => {
-    const next = makeInitialProgress();
-    setProgress(next);
-    saveProgress(next);
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 p-4 pb-28 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -615,10 +713,24 @@ export default function App() {
             </p>
           </div>
 
-          <PrimaryButton variant="outline" onClick={resetPlan} className="w-full md:w-auto">
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Reset progress
-          </PrimaryButton>
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+            <PrimaryButton
+              variant="outline"
+              onClick={() => setShowTodaysReading((value) => !value)}
+              className="w-full md:w-auto"
+            >
+              <ListChecks className="mr-2 h-4 w-4" />
+              {showTodaysReading ? "Hide today’s reading" : "Show today’s reading"}
+            </PrimaryButton>
+            <PrimaryButton
+              variant="outline"
+              onClick={() => setShowAdditionalReader((value) => !value)}
+              className="w-full md:w-auto"
+            >
+              <BookOpen className="mr-2 h-4 w-4" />
+              {showAdditionalReader ? "Hide comparison pane" : "Show comparison pane"}
+            </PrimaryButton>
+          </div>
         </div>
 
         {mainPage === "reader" && (
@@ -683,94 +795,113 @@ export default function App() {
                           {chapterData.translationName || "Loading translation..."}
                         </p>
                       </div>
-                      <Badge active={activeReadState.isRead}>
-                        {activeReadState.isRead ? "Read" : "Unread"}
-                      </Badge>
+                      {activeReadState.book && activeReadState.chapter ? (
+                        <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={activeReadState.isRead}
+                            onChange={(e) =>
+                              markChapterValue(
+                                activeReadState.book,
+                                activeReadState.chapter - 1,
+                                e.target.checked
+                              )
+                            }
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                          <span>{activeReadState.isRead ? "Read" : "Unread"}</span>
+                        </label>
+                      ) : null}
                     </div>
-
-                    {activeReadState.book && activeReadState.chapter ? (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <PrimaryButton
-                          onClick={() =>
-                            markChapterValue(activeReadState.book, activeReadState.chapter - 1, true)
-                          }
-                        >
-                          Mark as read
-                        </PrimaryButton>
-                        <PrimaryButton
-                          variant="outline"
-                          onClick={() =>
-                            markChapterValue(activeReadState.book, activeReadState.chapter - 1, false)
-                          }
-                        >
-                          Mark as unread
-                        </PrimaryButton>
-                      </div>
-                    ) : null}
 
                     <div className="mt-6 rounded-3xl bg-slate-50 p-4">
-                      {loadingChapter ? (
-                        <div className="space-y-3">
-                          <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
-                          <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
-                          <div className="h-4 w-[92%] animate-pulse rounded bg-slate-200" />
-                          <div className="h-4 w-[85%] animate-pulse rounded bg-slate-200" />
+                      <ChapterTextContent
+                        loading={loadingChapter}
+                        error={chapterError}
+                        verses={chapterData.verses}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {showAdditionalReader && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+                        <BookOpen className="h-5 w-5" />
+                        Additional reading pane
+                      </div>
+                      <SelectInput value={additionalTranslation} onChange={setAdditionalTranslation}>
+                        {translations.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </SelectInput>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-xl font-semibold text-slate-900">{activeReference}</h2>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {additionalChapterData.translationName || "Loading translation..."}
+                          </p>
                         </div>
-                      ) : chapterError ? (
-                        <div className="text-sm text-red-600">{chapterError}</div>
+                        <Badge>{additionalTranslation.toUpperCase()}</Badge>
+                      </div>
+
+                      <div className="mt-6 rounded-3xl bg-slate-50 p-4">
+                        <ChapterTextContent
+                          loading={loadingAdditionalChapter}
+                          error={additionalChapterError}
+                          verses={additionalChapterData.verses}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {showTodaysReading && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+                      <ListChecks className="h-5 w-5" />
+                      Today’s reading
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                      {todayPlan ? (
+                        <>
+                          <div className="text-sm text-slate-500">Current assignment</div>
+                          <div className="mt-1 text-lg font-semibold text-slate-900">
+                            Day {todayPlan.day}
+                          </div>
+                          <p className="mt-3 text-sm leading-7 text-slate-700">
+                            {todayPlan.chapters.map((item) => item.label).join(", ")}
+                          </p>
+                        </>
                       ) : (
-                        <div className="space-y-4">
-                          {chapterData.verses.map((verse) => (
-                            <div key={`${verse.book_id}-${verse.chapter}-${verse.verse}`} className="flex gap-3">
-                              <div className="min-w-8 pt-0.5 text-right text-xs font-semibold text-slate-500">
-                                {verse.verse}
-                              </div>
-                              <p className="text-sm leading-7 text-slate-700 whitespace-pre-wrap">
-                                {verse.text?.trim()}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
+                        <div className="text-slate-600">No plan available</div>
                       )}
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-                    <ListChecks className="h-5 w-5" />
-                    Today’s reading
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    {todayPlan ? (
-                      <>
-                        <div className="text-sm text-slate-500">Current assignment</div>
-                        <div className="mt-1 text-lg font-semibold text-slate-900">
-                          Day {todayPlan.day}
-                        </div>
-                        <p className="mt-3 text-sm leading-7 text-slate-700">
-                          {todayPlan.chapters.map((item) => item.label).join(", ")}
-                        </p>
-                      </>
-                    ) : (
-                      <div className="text-slate-600">No plan available</div>
-                    )}
-                  </div>
-
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm text-slate-500">Plan summary</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {selectedPlan.replace(/-/g, " ")}
+                    <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                      <div className="text-sm text-slate-500">Plan summary</div>
+                      <div className="mt-1 text-lg font-semibold text-slate-900">
+                        {selectedPlan.replace(/-/g, " ")}
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">Target length: {days} days</p>
+                      <p className="mt-1 text-sm text-slate-600">Update plan settings in Profile.</p>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">Target length: {days} days</p>
-                    <p className="mt-1 text-sm text-slate-600">Update plan settings in Profile.</p>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             <Card>

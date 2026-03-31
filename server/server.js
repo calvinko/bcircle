@@ -24,7 +24,10 @@ const DEFAULT_READING_PLAN = {
   days: '365',
   activeReference: 'Genesis 1',
   mainPage: 'reader',
-  translation: 'web'
+  translation: 'web',
+  showTodaysReading: true,
+  showAdditionalReader: false,
+  additionalTranslation: 'kjv'
 };
 
 function normalizeProfile(profile = {}) {
@@ -55,7 +58,19 @@ function normalizeReadingPlan(readingPlan = {}) {
     translation:
       typeof readingPlan.translation === 'string'
         ? readingPlan.translation
-        : DEFAULT_READING_PLAN.translation
+        : DEFAULT_READING_PLAN.translation,
+    showTodaysReading:
+      typeof readingPlan.showTodaysReading === 'boolean'
+        ? readingPlan.showTodaysReading
+        : DEFAULT_READING_PLAN.showTodaysReading,
+    showAdditionalReader:
+      typeof readingPlan.showAdditionalReader === 'boolean'
+        ? readingPlan.showAdditionalReader
+        : DEFAULT_READING_PLAN.showAdditionalReader,
+    additionalTranslation:
+      typeof readingPlan.additionalTranslation === 'string'
+        ? readingPlan.additionalTranslation
+        : DEFAULT_READING_PLAN.additionalTranslation
   };
 }
 
@@ -80,6 +95,9 @@ async function ensureStoredUserDataTable() {
       active_reference VARCHAR(100) NULL,
       main_page VARCHAR(50) NULL,
       translation VARCHAR(20) NULL,
+      show_todays_reading BOOLEAN NULL,
+      show_additional_reader BOOLEAN NULL,
+      additional_translation VARCHAR(20) NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB
@@ -101,6 +119,9 @@ async function readStoredUserData() {
       active_reference,
       main_page,
       translation,
+      show_todays_reading,
+      show_additional_reader,
+      additional_translation,
       updated_at
     FROM app_user_profile_storage
     WHERE id = 1
@@ -125,7 +146,10 @@ async function readStoredUserData() {
       days: row.days,
       activeReference: row.active_reference,
       mainPage: row.main_page,
-      translation: row.translation
+      translation: row.translation,
+      showTodaysReading: row.show_todays_reading,
+      showAdditionalReader: row.show_additional_reader,
+      additionalTranslation: row.additional_translation
     },
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at
   });
@@ -148,9 +172,12 @@ async function writeStoredUserData(payload) {
       days,
       active_reference,
       main_page,
-      translation
+      translation,
+      show_todays_reading,
+      show_additional_reader,
+      additional_translation
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
       email = VALUES(email),
@@ -160,7 +187,10 @@ async function writeStoredUserData(payload) {
       days = VALUES(days),
       active_reference = VALUES(active_reference),
       main_page = VALUES(main_page),
-      translation = VALUES(translation)
+      translation = VALUES(translation),
+      show_todays_reading = VALUES(show_todays_reading),
+      show_additional_reader = VALUES(show_additional_reader),
+      additional_translation = VALUES(additional_translation)
     `,
     [
       1,
@@ -172,7 +202,10 @@ async function writeStoredUserData(payload) {
       normalized.readingPlan.days,
       normalized.readingPlan.activeReference,
       normalized.readingPlan.mainPage,
-      normalized.readingPlan.translation
+      normalized.readingPlan.translation,
+      normalized.readingPlan.showTodaysReading,
+      normalized.readingPlan.showAdditionalReader,
+      normalized.readingPlan.additionalTranslation
     ]
   );
 

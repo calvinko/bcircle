@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS app_user_profile_storage (
   active_reference VARCHAR(100) NULL,
   main_page VARCHAR(50) NULL,
   translation VARCHAR(20) NULL,
+  show_todays_reading BOOLEAN NULL,
+  show_additional_reader BOOLEAN NULL,
+  additional_translation VARCHAR(20) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
