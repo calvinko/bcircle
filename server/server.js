@@ -3,20 +3,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { pool } from './db.js';
 import { requireAuth, signToken } from './auth.js';
 
 dotenv.config();
 
 const app = express();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3001);
-const DATA_DIR = path.join(__dirname, 'data');
-const DATA_FILE = path.join(DATA_DIR, 'user-profile.json');
 
 const DEFAULT_PROFILE = {
   name: 'Bible Reader',
@@ -73,31 +66,116 @@ function normalizeStoredUserData(payload = {}) {
   };
 }
 
-async function ensureDataFile() {
-  await mkdir(DATA_DIR, { recursive: true });
-
-  try {
-    await readFile(DATA_FILE, 'utf8');
-  } catch {
-    await writeFile(DATA_FILE, JSON.stringify(normalizeStoredUserData({}), null, 2));
-  }
+async function ensureStoredUserDataTable() {
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS app_user_profile_storage (
+      id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+      name VARCHAR(100) NULL,
+      email VARCHAR(255) NULL,
+      goal VARCHAR(255) NULL,
+      selected_plan VARCHAR(50) NULL,
+      search VARCHAR(255) NULL,
+      days VARCHAR(20) NULL,
+      active_reference VARCHAR(100) NULL,
+      main_page VARCHAR(50) NULL,
+      translation VARCHAR(20) NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB
+  `);
 }
 
 async function readStoredUserData() {
-  await ensureDataFile();
-  const raw = await readFile(DATA_FILE, 'utf8');
-  return normalizeStoredUserData(JSON.parse(raw));
+  await ensureStoredUserDataTable();
+
+  const [rows] = await pool.execute(
+    `
+    SELECT
+      name,
+      email,
+      goal,
+      selected_plan,
+      search,
+      days,
+      active_reference,
+      main_page,
+      translation,
+      updated_at
+    FROM app_user_profile_storage
+    WHERE id = 1
+    LIMIT 1
+    `
+  );
+
+  if (rows.length === 0) {
+    return normalizeStoredUserData({});
+  }
+
+  const row = rows[0];
+  return normalizeStoredUserData({
+    profile: {
+      name: row.name,
+      email: row.email,
+      goal: row.goal
+    },
+    readingPlan: {
+      selectedPlan: row.selected_plan,
+      search: row.search,
+      days: row.days,
+      activeReference: row.active_reference,
+      mainPage: row.main_page,
+      translation: row.translation
+    },
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at
+  });
 }
 
 async function writeStoredUserData(payload) {
-  const normalized = normalizeStoredUserData({
-    ...payload,
-    updatedAt: new Date().toISOString()
-  });
+  await ensureStoredUserDataTable();
 
-  await ensureDataFile();
-  await writeFile(DATA_FILE, JSON.stringify(normalized, null, 2));
-  return normalized;
+  const normalized = normalizeStoredUserData(payload);
+
+  await pool.execute(
+    `
+    INSERT INTO app_user_profile_storage (
+      id,
+      name,
+      email,
+      goal,
+      selected_plan,
+      search,
+      days,
+      active_reference,
+      main_page,
+      translation
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      name = VALUES(name),
+      email = VALUES(email),
+      goal = VALUES(goal),
+      selected_plan = VALUES(selected_plan),
+      search = VALUES(search),
+      days = VALUES(days),
+      active_reference = VALUES(active_reference),
+      main_page = VALUES(main_page),
+      translation = VALUES(translation)
+    `,
+    [
+      1,
+      normalized.profile.name,
+      normalized.profile.email,
+      normalized.profile.goal,
+      normalized.readingPlan.selectedPlan,
+      normalized.readingPlan.search,
+      normalized.readingPlan.days,
+      normalized.readingPlan.activeReference,
+      normalized.readingPlan.mainPage,
+      normalized.readingPlan.translation
+    ]
+  );
+
+  return readStoredUserData();
 }
 
 app.use(

@@ -21,7 +21,7 @@ const newTestament = bibleBooks.slice(39);
 const STORAGE_KEY = "bible-reading-progress-v6";
 const SETTINGS_KEY = "bible-reading-settings-v5";
 const PROFILE_KEY = "bible-reading-profile-v4";
-const API_BASE = "/api";
+const API_BASE = "https://biblecircle.org/api/api";
 
 const DEFAULT_SETTINGS = {
   selectedPlan: "whole-bible",
