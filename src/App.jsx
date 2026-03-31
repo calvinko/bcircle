@@ -52,15 +52,6 @@ const translations = [
   { id: "cuv", label: "Chinese Union Version (CUV)" },
 ];
 
-const allChapters = bibleBooks.flatMap((book) =>
-  Array.from({ length: book.chapters }, (_, i) => ({
-    book: book.name,
-    bookId: book.id,
-    chapter: i + 1,
-    label: `${book.name} ${i + 1}`,
-  }))
-);
-
 function makeInitialProgress() {
   const progress = {};
   bibleBooks.forEach((book) => {
@@ -546,6 +537,8 @@ export default function App() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
   const [showDailyPlan, setShowDailyPlan] = useState(false);
+  const [showChapterChooser, setShowChapterChooser] = useState(false);
+  const [chapterChooserBook, setChapterChooserBook] = useState("");
   const [syncStatus, setSyncStatus] = useState({
     state: "connecting",
     message: "Connecting to backend storage...",
@@ -814,6 +807,21 @@ export default function App() {
     };
   }, [activeReference, progress]);
 
+  const activeBook = useMemo(
+    () => bibleBooks.find((book) => book.name === activeReadState.book) || null,
+    [activeReadState.book]
+  );
+
+  const chooserBook = useMemo(
+    () => bibleBooks.find((book) => book.name === chapterChooserBook) || activeBook || bibleBooks[0],
+    [chapterChooserBook, activeBook]
+  );
+
+  const chooserBookChapters = useMemo(() => {
+    if (!chooserBook) return [];
+    return Array.from({ length: chooserBook.chapters }, (_, index) => index + 1);
+  }, [chooserBook]);
+
   const toggleChapter = (bookName, chapterIndex) => {
     setProgress((prev) => {
       const next = { ...prev, [bookName]: [...prev[bookName]] };
@@ -1046,6 +1054,18 @@ export default function App() {
     void updateReaderFontSize(1);
   };
 
+  const handleChooseChapter = (bookName, chapterNumber) => {
+    setActiveReference(`${bookName} ${chapterNumber}`);
+    setChapterChooserBook(bookName);
+    setShowChapterChooser(false);
+  };
+
+  useEffect(() => {
+    if (activeBook?.name) {
+      setChapterChooserBook(activeBook.name);
+    }
+  }, [activeBook]);
+
   const goToAdjacentChapter = (direction) => {
     const parsed = parseReference(activeReference);
     if (!parsed) return;
@@ -1131,14 +1151,17 @@ export default function App() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
-                    <SelectInput value={activeReference} onChange={setActiveReference}>
-                      {allChapters.map((item) => (
-                        <option key={item.label} value={item.label}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </SelectInput>
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+                    <button
+                      type="button"
+                      onClick={() => setShowChapterChooser((current) => !current)}
+                      className="flex w-full items-center justify-between rounded-2xl border border-slate-300 bg-white px-4 py-3 text-left text-sm text-slate-900 transition hover:border-slate-400"
+                    >
+                      <span className="truncate">{activeReference}</span>
+                      <span className="ml-3 text-xs font-medium text-slate-500">
+                        {showChapterChooser ? "Close" : "Choose"}
+                      </span>
+                    </button>
                     <PrimaryButton variant="outline" onClick={() => goToAdjacentChapter("prev")}>
                       <ChevronLeft className="h-4 w-4" />
                     </PrimaryButton>
@@ -1149,6 +1172,69 @@ export default function App() {
                       <RefreshCw className="h-4 w-4" />
                     </PrimaryButton>
                   </div>
+
+                  {showChapterChooser ? (
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Books
+                          </p>
+                          <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
+                            {bibleBooks.map((book) => {
+                              const active = chooserBook?.name === book.name;
+                              return (
+                                <button
+                                  key={book.id}
+                                  type="button"
+                                  onClick={() => setChapterChooserBook(book.name)}
+                                  className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm transition ${
+                                    active
+                                      ? "bg-slate-900 text-white"
+                                      : "bg-white text-slate-700 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  <span>{book.name}</span>
+                                  <span
+                                    className={`text-xs ${active ? "text-slate-200" : "text-slate-400"}`}
+                                  >
+                                    {book.chapters}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {chooserBook?.name || "Chapters"}
+                          </p>
+                          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
+                            {chooserBookChapters.map((chapter) => {
+                              const selected =
+                                activeReadState.book === chooserBook?.name &&
+                                activeReadState.chapter === chapter;
+                              return (
+                                <button
+                                  key={`${chooserBook?.name}-${chapter}`}
+                                  type="button"
+                                  onClick={() => handleChooseChapter(chooserBook.name, chapter)}
+                                  className={`rounded-2xl border px-3 py-2 text-sm font-medium transition ${
+                                    selected
+                                      ? "border-slate-900 bg-slate-900 text-white"
+                                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  {chapter}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="rounded-3xl border border-slate-200 bg-white p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
