@@ -33,7 +33,7 @@ const DEFAULT_SETTINGS = {
   mainPage: "reader",
   translation: "web",
   readerFontSize: 15,
-  showTodaysReading: true,
+  showTodaysReading: false,
   showAdditionalReader: false,
   additionalTranslation: "kjv",
 };
