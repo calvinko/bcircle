@@ -10,7 +10,13 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
-const CLIENT_ORIGIN = 'https://biblecircle.vercel.app';
+const ALLOWED_ORIGINS = new Set([
+  'https://biblecircle.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000'
+]);
 
 const DEFAULT_PROFILE = {
   name: 'Bible Reader',
@@ -240,13 +246,25 @@ async function writeStoredUserData(payload) {
 }
 
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', CLIENT_ORIGIN);
+  const origin = req.headers.origin;
+
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
   next();
 });
 
 app.use(
   cors({
-    origin: CLIENT_ORIGIN,
+    origin(origin, callback) {
+      if (!origin || ALLOWED_ORIGINS.has(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: false
   })
 );
