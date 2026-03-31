@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS = {
   activeReference: "Genesis 1",
   mainPage: "reader",
   translation: "web",
+  readerFontSize: 15,
   showTodaysReading: true,
   showAdditionalReader: false,
   additionalTranslation: "kjv",
@@ -178,6 +179,10 @@ function normalizeSettings(settings = {}) {
       typeof settings.translation === "string"
         ? settings.translation
         : DEFAULT_SETTINGS.translation,
+    readerFontSize:
+      typeof settings.readerFontSize === "number"
+        ? Math.max(12, Math.min(24, settings.readerFontSize))
+        : DEFAULT_SETTINGS.readerFontSize,
     showTodaysReading:
       typeof settings.showTodaysReading === "boolean"
         ? settings.showTodaysReading
@@ -412,7 +417,7 @@ function ProgressBar({ value }) {
   );
 }
 
-function ChapterTextContent({ loading, error, verses }) {
+function ChapterTextContent({ loading, error, verses, fontSize }) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -435,7 +440,10 @@ function ChapterTextContent({ loading, error, verses }) {
           <div className="min-w-8 pt-0.5 text-right text-xs font-semibold text-slate-500">
             {verse.verse}
           </div>
-          <p className="text-sm leading-5 text-slate-700 whitespace-pre-wrap">
+          <p
+            className="text-slate-700 whitespace-pre-wrap"
+            style={{ fontSize: `${fontSize}px`, lineHeight: 1.45 }}
+          >
             {verse.text?.trim()}
           </p>
         </div>
@@ -483,6 +491,9 @@ export default function App() {
   const [activeReference, setActiveReference] = useState(loadedSettings.activeReference || "Genesis 1");
   const [mainPage, setMainPage] = useState(loadedSettings.mainPage || "reader");
   const [translation, setTranslation] = useState(loadedSettings.translation || "web");
+  const [readerFontSize, setReaderFontSize] = useState(
+    loadedSettings.readerFontSize || DEFAULT_SETTINGS.readerFontSize
+  );
   const [showTodaysReading, setShowTodaysReading] = useState(
     loadedSettings.showTodaysReading ?? true
   );
@@ -514,6 +525,10 @@ export default function App() {
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authError, setAuthError] = useState("");
   const [remoteReady, setRemoteReady] = useState(false);
+  const [savedProfile, setSavedProfile] = useState(() => normalizeProfile(loadProfile()));
+  const [savedSettings, setSavedSettings] = useState(() => normalizeSettings(loadSettings()));
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
   const [syncStatus, setSyncStatus] = useState({
     state: "connecting",
     message: "Connecting to backend storage...",
@@ -529,6 +544,7 @@ export default function App() {
         activeReference,
         mainPage,
         translation,
+        readerFontSize,
         showTodaysReading,
         showAdditionalReader,
         additionalTranslation,
@@ -540,6 +556,7 @@ export default function App() {
       activeReference,
       mainPage,
       translation,
+      readerFontSize,
       showTodaysReading,
       showAdditionalReader,
       additionalTranslation,
@@ -601,10 +618,13 @@ export default function App() {
         setActiveReference(nextSettings.activeReference);
         setMainPage(nextSettings.mainPage);
         setTranslation(nextSettings.translation);
+        setReaderFontSize(nextSettings.readerFontSize);
         setShowTodaysReading(nextSettings.showTodaysReading);
         setShowAdditionalReader(nextSettings.showAdditionalReader);
         setAdditionalTranslation(nextSettings.additionalTranslation);
         setProfile(nextProfile);
+        setSavedProfile(nextProfile);
+        setSavedSettings(nextSettings);
         setCurrentUser((prev) => prev || normalizeAuthUser({ email: nextProfile.email }));
         saveProgress(nextProgress);
         saveSettings(nextSettings);
@@ -646,8 +666,8 @@ export default function App() {
 
     const payload = {
       progress: normalizeProgress(progress),
-      profile: normalizeProfile(profile),
-      readingPlan: settings,
+      profile: savedProfile,
+      readingPlan: savedSettings,
     };
 
     const timeoutId = window.setTimeout(async () => {
@@ -822,6 +842,7 @@ export default function App() {
     setActiveReference(DEFAULT_SETTINGS.activeReference);
     setMainPage(DEFAULT_SETTINGS.mainPage);
     setTranslation(DEFAULT_SETTINGS.translation);
+    setReaderFontSize(DEFAULT_SETTINGS.readerFontSize);
     setShowTodaysReading(DEFAULT_SETTINGS.showTodaysReading);
     setShowAdditionalReader(DEFAULT_SETTINGS.showAdditionalReader);
     setAdditionalTranslation(DEFAULT_SETTINGS.additionalTranslation);
@@ -853,6 +874,8 @@ export default function App() {
     setCurrentUser(null);
     setAuthError("");
     setAuthForm({ displayName: "", email: "", password: "" });
+    setSavedProfile(DEFAULT_PROFILE);
+    setSavedSettings(DEFAULT_SETTINGS);
     resetGuestState();
     setSyncStatus({
       state: "offline",
@@ -886,6 +909,103 @@ export default function App() {
     } finally {
       setAuthSubmitting(false);
     }
+  };
+
+  const handleSaveProfile = async () => {
+    const nextProfile = normalizeProfile(profile);
+    saveProfile(nextProfile);
+
+    if (!authToken) {
+      setSavedProfile(nextProfile);
+      setSyncStatus({
+        state: "offline",
+        message: "Profile saved on this device. Sign in to save it to your account.",
+        updatedAt: "",
+      });
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      const data = await saveStoredUserData(
+        {
+          progress: normalizeProgress(progress),
+          profile: nextProfile,
+          readingPlan: savedSettings,
+        },
+        authToken
+      );
+      const normalizedSavedProfile = normalizeProfile(data.profile);
+      setSavedProfile(normalizedSavedProfile);
+      setProfile(normalizedSavedProfile);
+      setCurrentUser((prev) =>
+        prev ? { ...prev, email: normalizedSavedProfile.email || prev.email } : prev
+      );
+      saveProfile(normalizedSavedProfile);
+      setSyncStatus({
+        state: "connected",
+        message: "Profile saved to your account.",
+        updatedAt: data.updatedAt || "",
+      });
+    } catch {
+      setSyncStatus({
+        state: "offline",
+        message: "Could not save your profile to the backend.",
+        updatedAt: "",
+      });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleSaveReadingPlan = async () => {
+    saveSettings(settings);
+
+    if (!authToken) {
+      setSavedSettings(settings);
+      setSyncStatus({
+        state: "offline",
+        message: "Reading plan saved on this device. Sign in to save it to your account.",
+        updatedAt: "",
+      });
+      return;
+    }
+
+    setSavingPlan(true);
+    try {
+      const data = await saveStoredUserData(
+        {
+          progress: normalizeProgress(progress),
+          profile: savedProfile,
+          readingPlan: settings,
+        },
+        authToken
+      );
+      const normalizedSavedSettings = normalizeSettings(data.readingPlan);
+      setSavedSettings(normalizedSavedSettings);
+      saveSettings(normalizedSavedSettings);
+      setSyncStatus({
+        state: "connected",
+        message: "Reading plan saved to your account.",
+        updatedAt: data.updatedAt || "",
+      });
+    } catch {
+      setSyncStatus({
+        state: "offline",
+        message: "Could not save your reading plan to the backend.",
+        updatedAt: "",
+      });
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  const decreaseReaderFontSize = () => {
+    setReaderFontSize((value) => Math.max(12, value - 1));
+  };
+
+  const increaseReaderFontSize = () => {
+    setReaderFontSize((value) => Math.min(24, value + 1));
   };
 
   const goToAdjacentChapter = (direction) => {
@@ -1011,23 +1131,41 @@ export default function App() {
                           {chapterData.translationName || "Loading translation..."}
                         </p>
                       </div>
-                      {activeReadState.book && activeReadState.chapter ? (
-                        <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={activeReadState.isRead}
-                            onChange={(e) =>
-                              markChapterValue(
-                                activeReadState.book,
-                                activeReadState.chapter - 1,
-                                e.target.checked
-                              )
-                            }
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                          <span>{activeReadState.isRead ? "Read" : "Unread"}</span>
-                        </label>
-                      ) : null}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <PrimaryButton
+                          variant="outline"
+                          className="px-3 py-2"
+                          onClick={decreaseReaderFontSize}
+                          aria-label="Decrease font size"
+                        >
+                          A-
+                        </PrimaryButton>
+                        <PrimaryButton
+                          variant="outline"
+                          className="px-3 py-2"
+                          onClick={increaseReaderFontSize}
+                          aria-label="Increase font size"
+                        >
+                          A+
+                        </PrimaryButton>
+                        {activeReadState.book && activeReadState.chapter ? (
+                          <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={activeReadState.isRead}
+                              onChange={(e) =>
+                                markChapterValue(
+                                  activeReadState.book,
+                                  activeReadState.chapter - 1,
+                                  e.target.checked
+                                )
+                              }
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+                            <span>{activeReadState.isRead ? "Read" : "Unread"}</span>
+                          </label>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="mt-6 rounded-3xl bg-slate-50 p-4">
@@ -1035,6 +1173,7 @@ export default function App() {
                         loading={loadingChapter}
                         error={chapterError}
                         verses={chapterData.verses}
+                        fontSize={readerFontSize}
                       />
                     </div>
                   </div>
@@ -1075,6 +1214,7 @@ export default function App() {
                           loading={loadingAdditionalChapter}
                           error={additionalChapterError}
                           verses={additionalChapterData.verses}
+                          fontSize={readerFontSize}
                         />
                       </div>
                     </div>
@@ -1433,6 +1573,9 @@ export default function App() {
                       }
                     />
                   </div>
+                  <PrimaryButton onClick={handleSaveProfile} disabled={savingProfile}>
+                    {savingProfile ? "Saving profile..." : "Save profile"}
+                  </PrimaryButton>
                 </div>
 
                 <div className="space-y-4">
@@ -1538,6 +1681,10 @@ export default function App() {
                       <div className="mt-1 text-slate-600">No plan available</div>
                     )}
                   </div>
+
+                  <PrimaryButton onClick={handleSaveReadingPlan} disabled={savingPlan}>
+                    {savingPlan ? "Saving plan..." : "Save reading plan"}
+                  </PrimaryButton>
                 </CardContent>
               </Card>
 

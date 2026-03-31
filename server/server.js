@@ -43,6 +43,7 @@ const DEFAULT_READING_PLAN = {
   activeReference: 'Genesis 1',
   mainPage: 'reader',
   translation: 'web',
+  readerFontSize: 15,
   showTodaysReading: true,
   showAdditionalReader: false,
   additionalTranslation: 'kjv'
@@ -77,6 +78,10 @@ function normalizeReadingPlan(readingPlan = {}) {
       typeof readingPlan.translation === 'string'
         ? readingPlan.translation
         : DEFAULT_READING_PLAN.translation,
+    readerFontSize:
+      typeof readingPlan.readerFontSize === 'number'
+        ? Math.max(12, Math.min(24, readingPlan.readerFontSize))
+        : DEFAULT_READING_PLAN.readerFontSize,
     showTodaysReading:
       typeof readingPlan.showTodaysReading === 'boolean'
         ? readingPlan.showTodaysReading
@@ -131,6 +136,7 @@ async function ensureStoredUserDataTable() {
       active_reference VARCHAR(100) NULL,
       main_page VARCHAR(50) NULL,
       translation VARCHAR(20) NULL,
+      reader_font_size SMALLINT NULL,
       show_todays_reading BOOLEAN NULL,
       show_additional_reader BOOLEAN NULL,
       additional_translation VARCHAR(20) NULL,
@@ -162,6 +168,7 @@ async function readStoredUserData(userId, fallbackEmail = DEFAULT_PROFILE.email)
       active_reference,
       main_page,
       translation,
+      reader_font_size,
       show_todays_reading,
       show_additional_reader,
       additional_translation,
@@ -201,6 +208,7 @@ async function readStoredUserData(userId, fallbackEmail = DEFAULT_PROFILE.email)
       activeReference: row.active_reference,
       mainPage: row.main_page,
       translation: row.translation,
+      readerFontSize: row.reader_font_size,
       showTodaysReading: row.show_todays_reading,
       showAdditionalReader: row.show_additional_reader,
       additionalTranslation: row.additional_translation
@@ -233,12 +241,13 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       active_reference,
       main_page,
       translation,
+      reader_font_size,
       show_todays_reading,
       show_additional_reader,
       additional_translation,
       progress_json
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
       email = VALUES(email),
@@ -249,6 +258,7 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       active_reference = VALUES(active_reference),
       main_page = VALUES(main_page),
       translation = VALUES(translation),
+      reader_font_size = VALUES(reader_font_size),
       show_todays_reading = VALUES(show_todays_reading),
       show_additional_reader = VALUES(show_additional_reader),
       additional_translation = VALUES(additional_translation),
@@ -265,6 +275,7 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       normalized.readingPlan.activeReference,
       normalized.readingPlan.mainPage,
       normalized.readingPlan.translation,
+      normalized.readingPlan.readerFontSize,
       normalized.readingPlan.showTodaysReading,
       normalized.readingPlan.showAdditionalReader,
       normalized.readingPlan.additionalTranslation,
@@ -380,6 +391,7 @@ app.post('/api/auth/register', async (req, res) => {
         active_reference,
         main_page,
         translation,
+        reader_font_size,
         show_todays_reading,
         show_additional_reader,
         additional_translation,
@@ -398,6 +410,7 @@ app.post('/api/auth/register', async (req, res) => {
         DEFAULT_READING_PLAN.activeReference,
         DEFAULT_READING_PLAN.mainPage,
         DEFAULT_READING_PLAN.translation,
+        DEFAULT_READING_PLAN.readerFontSize,
         DEFAULT_READING_PLAN.showTodaysReading,
         DEFAULT_READING_PLAN.showAdditionalReader,
         DEFAULT_READING_PLAN.additionalTranslation,
