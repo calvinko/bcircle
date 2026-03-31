@@ -44,7 +44,6 @@ const DEFAULT_READING_PLAN = {
   mainPage: 'reader',
   translation: 'web',
   readerFontSize: 15,
-  showTodaysReading: true,
   showAdditionalReader: false,
   additionalTranslation: 'kjv'
 };
@@ -89,10 +88,6 @@ function normalizeReadingPlan(readingPlan = {}) {
       Number.isFinite(parsedReaderFontSize)
         ? Math.max(12, Math.min(24, parsedReaderFontSize))
         : DEFAULT_READING_PLAN.readerFontSize,
-    showTodaysReading:
-      typeof readingPlan.showTodaysReading === 'boolean'
-        ? readingPlan.showTodaysReading
-        : DEFAULT_READING_PLAN.showTodaysReading,
     showAdditionalReader:
       typeof readingPlan.showAdditionalReader === 'boolean'
         ? readingPlan.showAdditionalReader
@@ -176,7 +171,6 @@ async function readStoredUserData(userId, fallbackEmail = DEFAULT_PROFILE.email)
       main_page,
       translation,
       reader_font_size,
-      show_todays_reading,
       show_additional_reader,
       additional_translation,
       progress_json,
@@ -216,7 +210,6 @@ async function readStoredUserData(userId, fallbackEmail = DEFAULT_PROFILE.email)
       mainPage: row.main_page,
       translation: row.translation,
       readerFontSize: row.reader_font_size,
-      showTodaysReading: row.show_todays_reading,
       showAdditionalReader: row.show_additional_reader,
       additionalTranslation: row.additional_translation
     },
@@ -249,12 +242,11 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       main_page,
       translation,
       reader_font_size,
-      show_todays_reading,
       show_additional_reader,
       additional_translation,
       progress_json
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
       email = VALUES(email),
@@ -266,7 +258,6 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       main_page = VALUES(main_page),
       translation = VALUES(translation),
       reader_font_size = VALUES(reader_font_size),
-      show_todays_reading = VALUES(show_todays_reading),
       show_additional_reader = VALUES(show_additional_reader),
       additional_translation = VALUES(additional_translation),
       progress_json = VALUES(progress_json)
@@ -283,7 +274,6 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       normalized.readingPlan.mainPage,
       normalized.readingPlan.translation,
       normalized.readingPlan.readerFontSize,
-      normalized.readingPlan.showTodaysReading,
       normalized.readingPlan.showAdditionalReader,
       normalized.readingPlan.additionalTranslation,
       JSON.stringify(normalized.progress)
@@ -399,12 +389,11 @@ app.post('/api/auth/register', async (req, res) => {
         main_page,
         translation,
         reader_font_size,
-        show_todays_reading,
         show_additional_reader,
         additional_translation,
         progress_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         userResult.insertId,
@@ -418,7 +407,6 @@ app.post('/api/auth/register', async (req, res) => {
         DEFAULT_READING_PLAN.mainPage,
         DEFAULT_READING_PLAN.translation,
         DEFAULT_READING_PLAN.readerFontSize,
-        DEFAULT_READING_PLAN.showTodaysReading,
         DEFAULT_READING_PLAN.showAdditionalReader,
         DEFAULT_READING_PLAN.additionalTranslation,
         JSON.stringify({})

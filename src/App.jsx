@@ -204,6 +204,12 @@ function normalizeSettings(settings = {}) {
   };
 }
 
+function getRemoteReadingPlan(settings = {}) {
+  const normalized = normalizeSettings(settings);
+  const { showTodaysReading: _showTodaysReading, ...remoteReadingPlan } = normalized;
+  return remoteReadingPlan;
+}
+
 function normalizeProfile(profile = {}) {
   return {
     name: typeof profile.name === "string" ? profile.name : DEFAULT_PROFILE.name,
@@ -233,13 +239,18 @@ async function fetchStoredUserData(token) {
 }
 
 async function saveStoredUserData(payload, token) {
+  const requestPayload = {
+    ...payload,
+    readingPlan: getRemoteReadingPlan(payload.readingPlan),
+  };
+
   const response = await fetch(`${API_BASE}/user-profile`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(requestPayload),
   });
 
   if (!response.ok) {
@@ -614,7 +625,11 @@ export default function App() {
         if (cancelled) return;
 
         const nextProgress = normalizeProgress(data.progress);
-        const nextSettings = normalizeSettings(data.readingPlan);
+        const localSettings = loadSettings();
+        const nextSettings = normalizeSettings({
+          ...data.readingPlan,
+          showTodaysReading: localSettings.showTodaysReading,
+        });
         const nextProfile = normalizeProfile(data.profile);
 
         setProgress(nextProgress);
