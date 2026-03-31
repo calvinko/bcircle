@@ -3,13 +3,102 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { pool } from './db.js';
 import { requireAuth, signToken } from './auth.js';
 
 dotenv.config();
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3001);
+const DATA_DIR = path.join(__dirname, 'data');
+const DATA_FILE = path.join(DATA_DIR, 'user-profile.json');
+
+const DEFAULT_PROFILE = {
+  name: 'Bible Reader',
+  email: 'reader@example.com',
+  goal: 'Read every day'
+};
+
+const DEFAULT_READING_PLAN = {
+  selectedPlan: 'whole-bible',
+  search: '',
+  days: '365',
+  activeReference: 'Genesis 1',
+  mainPage: 'reader',
+  translation: 'web'
+};
+
+function normalizeProfile(profile = {}) {
+  return {
+    name: typeof profile.name === 'string' ? profile.name : DEFAULT_PROFILE.name,
+    email: typeof profile.email === 'string' ? profile.email : DEFAULT_PROFILE.email,
+    goal: typeof profile.goal === 'string' ? profile.goal : DEFAULT_PROFILE.goal
+  };
+}
+
+function normalizeReadingPlan(readingPlan = {}) {
+  return {
+    selectedPlan:
+      typeof readingPlan.selectedPlan === 'string'
+        ? readingPlan.selectedPlan
+        : DEFAULT_READING_PLAN.selectedPlan,
+    search:
+      typeof readingPlan.search === 'string' ? readingPlan.search : DEFAULT_READING_PLAN.search,
+    days: typeof readingPlan.days === 'string' ? readingPlan.days : DEFAULT_READING_PLAN.days,
+    activeReference:
+      typeof readingPlan.activeReference === 'string'
+        ? readingPlan.activeReference
+        : DEFAULT_READING_PLAN.activeReference,
+    mainPage:
+      typeof readingPlan.mainPage === 'string'
+        ? readingPlan.mainPage
+        : DEFAULT_READING_PLAN.mainPage,
+    translation:
+      typeof readingPlan.translation === 'string'
+        ? readingPlan.translation
+        : DEFAULT_READING_PLAN.translation
+  };
+}
+
+function normalizeStoredUserData(payload = {}) {
+  return {
+    profile: normalizeProfile(payload.profile),
+    readingPlan: normalizeReadingPlan(payload.readingPlan),
+    updatedAt: payload.updatedAt || new Date().toISOString()
+  };
+}
+
+async function ensureDataFile() {
+  await mkdir(DATA_DIR, { recursive: true });
+
+  try {
+    await readFile(DATA_FILE, 'utf8');
+  } catch {
+    await writeFile(DATA_FILE, JSON.stringify(normalizeStoredUserData({}), null, 2));
+  }
+}
+
+async function readStoredUserData() {
+  await ensureDataFile();
+  const raw = await readFile(DATA_FILE, 'utf8');
+  return normalizeStoredUserData(JSON.parse(raw));
+}
+
+async function writeStoredUserData(payload) {
+  const normalized = normalizeStoredUserData({
+    ...payload,
+    updatedAt: new Date().toISOString()
+  });
+
+  await ensureDataFile();
+  await writeFile(DATA_FILE, JSON.stringify(normalized, null, 2));
+  return normalized;
+}
 
 app.use(
   cors({
@@ -26,6 +115,26 @@ app.get('/api/health', async (_req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false });
+  }
+});
+
+app.get('/api/user-profile', async (_req, res) => {
+  try {
+    const data = await readStoredUserData();
+    res.json(data);
+  } catch (error) {
+    console.error('Get stored user profile failed:', error);
+    res.status(500).json({ error: 'Failed to read user data.' });
+  }
+});
+
+app.put('/api/user-profile', async (req, res) => {
+  try {
+    const saved = await writeStoredUserData(req.body ?? {});
+    res.json(saved);
+  } catch (error) {
+    console.error('Update stored user profile failed:', error);
+    res.status(400).json({ error: 'Failed to save user data.' });
   }
 });
 
