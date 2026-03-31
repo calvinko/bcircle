@@ -1313,11 +1313,11 @@ export default function App() {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8">
+                          <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-7 md:grid-cols-9 lg:grid-cols-10 xl:grid-cols-12">
                             {progress[book.name].map((isRead, index) => (
-                              <label
+                              <div
                                 key={`${book.name}-${index + 1}`}
-                                className={`flex cursor-pointer items-center gap-2 rounded-2xl border p-2 text-sm transition hover:shadow-sm ${
+                                className={`flex items-center gap-1.5 rounded-xl border px-1.5 py-1 text-xs transition hover:shadow-sm ${
                                   isRead
                                     ? "border-slate-300 bg-slate-100"
                                     : "border-slate-200 bg-white"
@@ -1327,12 +1327,19 @@ export default function App() {
                                   type="checkbox"
                                   checked={isRead}
                                   onChange={() => toggleChapter(book.name, index)}
-                                  className="h-4 w-4 rounded border-slate-300"
+                                  className="h-3.5 w-3.5 rounded border-slate-300"
                                 />
-                                <span onClick={() => setActiveReference(`${book.name} ${index + 1}`)}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveReference(`${book.name} ${index + 1}`);
+                                    setMainPage("reader");
+                                  }}
+                                  className="min-w-0 text-left text-slate-700 transition hover:text-slate-900"
+                                >
                                   {index + 1}
-                                </span>
-                              </label>
+                                </button>
+                              </div>
                             ))}
                           </div>
                         </CardContent>
