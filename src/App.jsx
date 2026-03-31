@@ -8,7 +8,6 @@ import {
   User,
   BarChart3,
   Home,
-  Settings,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -1041,7 +1040,7 @@ export default function App() {
             <div className="flex items-center gap-2">
               <BookOpen className="h-6 w-6 text-slate-900" />
               <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                Bible Reading App
+                Bible Circle
               </h1>
             </div>
             <p className="mt-2 text-sm text-slate-600">
@@ -1537,15 +1536,15 @@ export default function App() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-                  <User className="h-5 w-5" />
-                  User profile
-                </div>
-              </CardHeader>
-              <CardContent className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-4">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+                    <User className="h-5 w-5" />
+                    User profile
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
                     <p className="mb-2 text-sm font-medium text-slate-700">Display name</p>
                     <TextInput
@@ -1576,43 +1575,9 @@ export default function App() {
                   <PrimaryButton onClick={handleSaveProfile} disabled={savingProfile}>
                     {savingProfile ? "Saving profile..." : "Save profile"}
                   </PrimaryButton>
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="space-y-4">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm text-slate-500">Current chapter</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">{activeReference}</div>
-                  </div>
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm text-slate-500">Backend sync</div>
-                      <Badge active={syncStatus.state === "connected"}>
-                        {syncStatus.state === "connected" ? "Connected" : "Offline"}
-                      </Badge>
-                    </div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {syncStatus.message}
-                    </div>
-                    {syncStatus.updatedAt ? (
-                      <div className="mt-2 text-sm text-slate-500">
-                        Last saved: {new Date(syncStatus.updatedAt).toLocaleString()}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm text-slate-500">Reading summary</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {stats.readChapters} chapters completed
-                    </div>
-                    <div className="mt-2 text-sm text-slate-500">
-                      Use the sections below to manage plan and app preferences.
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
@@ -1688,33 +1653,26 @@ export default function App() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-                    <Settings className="h-5 w-5" />
-                    App settings
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm text-slate-500">Current plan</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {selectedPlan.replace(/-/g, " ")}
-                    </div>
-                  </div>
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm text-slate-500">Target length</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">{days} days</div>
-                  </div>
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm text-slate-500">Profile goal</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900">
-                      {profile.goal || "No goal set"}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
+
+            <Card>
+              <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-sm text-slate-500">Backend sync</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900">
+                    {syncStatus.message}
+                  </div>
+                  {syncStatus.updatedAt ? (
+                    <div className="mt-1 text-sm text-slate-500">
+                      Last saved: {new Date(syncStatus.updatedAt).toLocaleString()}
+                    </div>
+                  ) : null}
+                </div>
+                <Badge active={syncStatus.state === "connected"}>
+                  {syncStatus.state === "connected" ? "Connected" : "Offline"}
+                </Badge>
+              </CardContent>
+            </Card>
           </motion.div>
         )}
 
