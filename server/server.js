@@ -18,6 +18,18 @@ const ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:3000'
 ]);
 
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+
+  try {
+    const { protocol, hostname } = new URL(origin);
+    return protocol === 'https:' && hostname.endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
+}
+
 const DEFAULT_PROFILE = {
   name: 'Bible Reader',
   email: 'reader@example.com',
@@ -248,10 +260,8 @@ async function writeStoredUserData(payload) {
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
+  if (origin && isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', "https://biblecircle.vercel.app");
   }
 
   next();
@@ -260,7 +270,7 @@ app.use((req, res, next) => {
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || ALLOWED_ORIGINS.has(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true);
         return;
       }
