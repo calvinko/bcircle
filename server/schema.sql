@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS app_user_profile_storage (
   show_todays_reading BOOLEAN NULL,
   show_additional_reader BOOLEAN NULL,
   additional_translation VARCHAR(20) NULL,
+  progress_json JSON NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;

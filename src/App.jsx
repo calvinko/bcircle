@@ -69,17 +69,7 @@ function loadProgress() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return makeInitialProgress();
-    const parsed = JSON.parse(raw);
-    const fallback = makeInitialProgress();
-    for (const book of bibleBooks) {
-      if (Array.isArray(parsed[book.name])) {
-        fallback[book.name] = Array.from(
-          { length: book.chapters },
-          (_, i) => Boolean(parsed[book.name][i])
-        );
-      }
-    }
-    return fallback;
+    return normalizeProgress(JSON.parse(raw));
   } catch {
     return makeInitialProgress();
   }
@@ -115,6 +105,19 @@ function saveSettings(settings) {
 
 function saveProfile(profile) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
+function normalizeProgress(progress = {}) {
+  const fallback = makeInitialProgress();
+  for (const book of bibleBooks) {
+    if (Array.isArray(progress[book.name])) {
+      fallback[book.name] = Array.from(
+        { length: book.chapters },
+        (_, i) => Boolean(progress[book.name][i])
+      );
+    }
+  }
+  return fallback;
 }
 
 function normalizeSettings(settings = {}) {
@@ -466,9 +469,11 @@ export default function App() {
         const data = await fetchStoredUserData();
         if (cancelled) return;
 
+        const nextProgress = normalizeProgress(data.progress);
         const nextSettings = normalizeSettings(data.readingPlan);
         const nextProfile = normalizeProfile(data.profile);
 
+        setProgress(nextProgress);
         setSearch(nextSettings.search);
         setSelectedPlan(nextSettings.selectedPlan);
         setDays(nextSettings.days);
@@ -479,11 +484,12 @@ export default function App() {
         setShowAdditionalReader(nextSettings.showAdditionalReader);
         setAdditionalTranslation(nextSettings.additionalTranslation);
         setProfile(nextProfile);
+        saveProgress(nextProgress);
         saveSettings(nextSettings);
         saveProfile(nextProfile);
         setSyncStatus({
           state: "connected",
-          message: "Profile and reading plan are loading from backend storage.",
+          message: "Profile, reading plan, and progress are loading from backend storage.",
           updatedAt: data.updatedAt || "",
         });
       } catch {
@@ -508,6 +514,7 @@ export default function App() {
     if (!remoteReady) return;
 
     const payload = {
+      progress: normalizeProgress(progress),
       profile: normalizeProfile(profile),
       readingPlan: settings,
     };
@@ -519,7 +526,7 @@ export default function App() {
         if (cancelled) return;
         setSyncStatus({
           state: "connected",
-          message: "Profile and reading plan are saved to backend storage.",
+          message: "Profile, reading plan, and progress are saved to backend storage.",
           updatedAt: data.updatedAt || "",
         });
       } catch {
@@ -536,7 +543,7 @@ export default function App() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [profile, settings, remoteReady]);
+  }, [progress, profile, settings, remoteReady]);
 
   useEffect(() => {
     let cancelled = false;

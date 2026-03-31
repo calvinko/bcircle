@@ -76,10 +76,27 @@ function normalizeReadingPlan(readingPlan = {}) {
 
 function normalizeStoredUserData(payload = {}) {
   return {
+    progress: normalizeProgress(payload.progress),
     profile: normalizeProfile(payload.profile),
     readingPlan: normalizeReadingPlan(payload.readingPlan),
     updatedAt: payload.updatedAt || new Date().toISOString()
   };
+}
+
+function normalizeProgress(progress = {}) {
+  if (!progress || typeof progress !== 'object' || Array.isArray(progress)) {
+    return {};
+  }
+
+  const normalized = {};
+
+  for (const [bookName, chapterStates] of Object.entries(progress)) {
+    if (Array.isArray(chapterStates)) {
+      normalized[bookName] = chapterStates.map(Boolean);
+    }
+  }
+
+  return normalized;
 }
 
 async function ensureStoredUserDataTable() {
@@ -98,6 +115,7 @@ async function ensureStoredUserDataTable() {
       show_todays_reading BOOLEAN NULL,
       show_additional_reader BOOLEAN NULL,
       additional_translation VARCHAR(20) NULL,
+      progress_json JSON NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB
@@ -122,6 +140,7 @@ async function readStoredUserData() {
       show_todays_reading,
       show_additional_reader,
       additional_translation,
+      progress_json,
       updated_at
     FROM app_user_profile_storage
     WHERE id = 1
@@ -135,6 +154,11 @@ async function readStoredUserData() {
 
   const row = rows[0];
   return normalizeStoredUserData({
+    progress: row.progress_json
+      ? typeof row.progress_json === 'string'
+        ? JSON.parse(row.progress_json)
+        : row.progress_json
+      : {},
     profile: {
       name: row.name,
       email: row.email,
@@ -175,9 +199,10 @@ async function writeStoredUserData(payload) {
       translation,
       show_todays_reading,
       show_additional_reader,
-      additional_translation
+      additional_translation,
+      progress_json
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
       email = VALUES(email),
@@ -190,7 +215,8 @@ async function writeStoredUserData(payload) {
       translation = VALUES(translation),
       show_todays_reading = VALUES(show_todays_reading),
       show_additional_reader = VALUES(show_additional_reader),
-      additional_translation = VALUES(additional_translation)
+      additional_translation = VALUES(additional_translation),
+      progress_json = VALUES(progress_json)
     `,
     [
       1,
@@ -205,7 +231,8 @@ async function writeStoredUserData(payload) {
       normalized.readingPlan.translation,
       normalized.readingPlan.showTodaysReading,
       normalized.readingPlan.showAdditionalReader,
-      normalized.readingPlan.additionalTranslation
+      normalized.readingPlan.additionalTranslation,
+      JSON.stringify(normalized.progress)
     ]
   );
 
