@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { bibleBooks } from "./bibleBooks";
+import LoginCard from "./login";
 
 const oldTestament = bibleBooks.slice(0, 39);
 const newTestament = bibleBooks.slice(39);
@@ -360,7 +361,7 @@ function CardHeader({ children, className = "" }) {
 }
 
 function CardContent({ children, className = "" }) {
-  return <div className={`p-5 pt-2 ${className}`}>{children}</div>;
+  return <div className={`p-2 lg:p-5 pt-2 ${className}`}>{children}</div>;
 }
 
 function Badge({ children, active = false }) {
@@ -445,7 +446,7 @@ function ChapterTextContent({ loading, error, verses, fontSize }) {
     <div className="space-y-1.5">
       {verses.map((verse) => (
         <div key={`${verse.book_id}-${verse.chapter}-${verse.verse}`} className="flex gap-3">
-          <div className="min-w-8 pt-0.5 text-right text-xs font-semibold text-slate-500">
+          <div className="min-w-2 lg:min-w-8 pt-0.5 text-right text-xs font-semibold text-slate-500">
             {verse.verse}
           </div>
           <p
@@ -1092,7 +1093,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 pb-28 md:p-8">
+    <div className="min-h-screen bg-slate-50 p-2 lg:p-4 pb-28 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -1151,7 +1152,7 @@ export default function App() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+                  <div className="grid gap-3 grid-cols-[minmax(0,1fr)_auto_auto_auto]">
                     <button
                       type="button"
                       onClick={() => setShowChapterChooser((current) => !current)}
@@ -1168,9 +1169,7 @@ export default function App() {
                     <PrimaryButton variant="outline" onClick={() => goToAdjacentChapter("next")}>
                       <ChevronRight className="h-4 w-4" />
                     </PrimaryButton>
-                    <PrimaryButton variant="outline" onClick={() => setActiveReference((v) => `${v}`)}>
-                      <RefreshCw className="h-4 w-4" />
-                    </PrimaryButton>
+                    
                   </div>
 
                   {showChapterChooser ? (
@@ -1236,7 +1235,7 @@ export default function App() {
                     </div>
                   ) : null}
 
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-2 lg:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h2 className="text-xl font-semibold text-slate-900">{activeReference}</h2>
@@ -1281,7 +1280,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="mt-6 rounded-3xl bg-slate-50 p-4">
+                    <div className="mt-6 rounded-3xl bg-slate-50 p-2 lg:p-4">
                       <ChapterTextContent
                         loading={loadingChapter}
                         error={chapterError}
@@ -1540,96 +1539,25 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             className="space-y-6"
           >
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-                  <User className="h-5 w-5" />
-                  Account
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {!authToken ? (
-                  <>
-                    <div className="flex gap-2 rounded-3xl bg-slate-100 p-1">
-                      <TabButton active={authMode === "signin"} onClick={() => setAuthMode("signin")}>
-                        Sign in
-                      </TabButton>
-                      <TabButton
-                        active={authMode === "register"}
-                        onClick={() => setAuthMode("register")}
-                      >
-                        Register
-                      </TabButton>
-                    </div>
-
-                    <form onSubmit={handleAuthSubmit} className="grid gap-4 lg:grid-cols-2">
-                      {authMode === "register" ? (
-                        <div>
-                          <p className="mb-2 text-sm font-medium text-slate-700">Display name</p>
-                          <TextInput
-                            value={authForm.displayName}
-                            onChange={(e) => handleAuthFieldChange("displayName", e.target.value)}
-                            placeholder="Bible Reader"
-                          />
-                        </div>
-                      ) : null}
-                      <div>
-                        <p className="mb-2 text-sm font-medium text-slate-700">Email</p>
-                        <TextInput
-                          type="email"
-                          value={authForm.email}
-                          onChange={(e) => handleAuthFieldChange("email", e.target.value)}
-                          placeholder="reader@example.com"
-                        />
-                      </div>
-                      <div>
-                        <p className="mb-2 text-sm font-medium text-slate-700">Password</p>
-                        <TextInput
-                          type="password"
-                          value={authForm.password}
-                          onChange={(e) => handleAuthFieldChange("password", e.target.value)}
-                          placeholder="At least 8 characters"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <PrimaryButton type="submit" className="w-full" disabled={authSubmitting}>
-                          {authSubmitting
-                            ? authMode === "register"
-                              ? "Creating account..."
-                              : "Signing in..."
-                            : authMode === "register"
-                              ? "Create account"
-                              : "Sign in"}
-                        </PrimaryButton>
-                      </div>
-                    </form>
-
-                    {authError ? <div className="text-sm text-red-600">{authError}</div> : null}
-
-                    <div className="rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                      Sign in to keep your reading progress, plan, and profile separate for each user.
-                    </div>
-                  </>
-                ) : (
-                  <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                      <div className="text-sm text-slate-500">Signed in as</div>
-                      <div className="mt-1 text-lg font-semibold text-slate-900">
-                        {currentUser?.email || profile.email}
-                      </div>
-                      <div className="mt-2 text-sm text-slate-500">
-                        Your reading data now syncs per account.
-                      </div>
-                    </div>
-                    <div className="flex items-end">
-                      <PrimaryButton variant="outline" className="w-full lg:w-auto" onClick={handleSignOut}>
-                        Sign out
-                      </PrimaryButton>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <LoginCard
+              Card={Card}
+              CardHeader={CardHeader}
+              CardContent={CardContent}
+              TabButton={TabButton}
+              TextInput={TextInput}
+              PrimaryButton={PrimaryButton}
+              authToken={authToken}
+              authMode={authMode}
+              setAuthMode={setAuthMode}
+              handleAuthSubmit={handleAuthSubmit}
+              authForm={authForm}
+              handleAuthFieldChange={handleAuthFieldChange}
+              authSubmitting={authSubmitting}
+              authError={authError}
+              currentUser={currentUser}
+              profileEmail={profile.email}
+              handleSignOut={handleSignOut}
+            />
 
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
