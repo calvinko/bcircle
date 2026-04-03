@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ChevronDown,
   RefreshCw,
+  ListTree,
 } from "lucide-react";
 import { bibleBooks } from "./bibleBooks";
 import LoginCard from "./login";
@@ -1164,14 +1165,14 @@ export default function App() {
                         className="h-9 w-9 shrink-0 px-0"
                         onClick={() => goToAdjacentChapter("prev")}
                       >
-                        <ChevronLeft className="h-4 w-4" />
+                        &lt;
                       </PrimaryButton>
                       <PrimaryButton
                         variant="outline"
                         className="h-9 w-9 shrink-0 px-0"
                         onClick={() => goToAdjacentChapter("next")}
                       >
-                        <ChevronRight className="h-4 w-4" />
+                        &gt;
                       </PrimaryButton>
                       <div className="relative shrink-0">
                         <button
