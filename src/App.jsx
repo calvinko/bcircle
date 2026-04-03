@@ -541,6 +541,7 @@ export default function App() {
   const [savingPlan, setSavingPlan] = useState(false);
   const [showDailyPlan, setShowDailyPlan] = useState(false);
   const [showChapterChooser, setShowChapterChooser] = useState(false);
+  const [showTranslationChooser, setShowTranslationChooser] = useState(false);
   const [chapterChooserBook, setChapterChooserBook] = useState("");
   const [syncStatus, setSyncStatus] = useState({
     state: "connecting",
@@ -1173,27 +1174,54 @@ export default function App() {
                         <ChevronRight className="h-4 w-4" />
                       </PrimaryButton>
                       <div className="relative shrink-0">
-                        <BookOpen className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                        <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-wide text-slate-900">
-                          {translation.toUpperCase()}
-                        </span>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                        <SelectInput
-                          value={translation}
-                          onChange={setTranslation}
-                          className="w-24 appearance-none pl-9 pr-9 text-center text-xs font-semibold uppercase tracking-wide text-transparent"
+                        <button
+                          type="button"
+                          onClick={() => setShowTranslationChooser((current) => !current)}
+                          className="flex h-9 items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 text-xs font-semibold uppercase tracking-wide text-slate-900 transition hover:border-slate-400"
                           aria-label="Choose Bible version"
                           title={
                             translations.find((item) => item.id === translation)?.label ||
                             "Choose Bible version"
                           }
                         >
-                          {translations.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </SelectInput>
+                          <BookOpen className="h-4 w-4 text-slate-500" />
+                          <span>{translation.toUpperCase()}</span>
+                          <ChevronDown className="h-4 w-4 text-slate-500" />
+                        </button>
+
+                        {showTranslationChooser ? (
+                          <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg">
+                            <div className="space-y-1">
+                              {translations.map((item) => {
+                                const active = item.id === translation;
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setTranslation(item.id);
+                                      setShowTranslationChooser(false);
+                                    }}
+                                    className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm transition ${
+                                      active
+                                        ? "bg-slate-900 text-white"
+                                        : "bg-white text-slate-700 hover:bg-slate-100"
+                                    }`}
+                                  >
+                                    <span>{item.label}</span>
+                                    <span
+                                      className={`ml-3 text-xs font-semibold uppercase ${
+                                        active ? "text-slate-200" : "text-slate-400"
+                                      }`}
+                                    >
+                                      {item.id}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
