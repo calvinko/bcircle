@@ -1148,7 +1148,7 @@ export default function App() {
                     <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
                       <BookOpen className="h-5 w-5" />
                     </div>
-                    <div className="flex items-center gap-2 pb-1">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
                       <button
                         type="button"
                         onClick={() => setShowChapterChooser((current) => !current)}
