@@ -10,6 +10,7 @@ import {
   Home,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   RefreshCw,
 } from "lucide-react";
 import { bibleBooks } from "./bibleBooks";
@@ -403,12 +404,13 @@ function TextInput({ className = "", ...props }) {
   );
 }
 
-function SelectInput({ value, onChange, children }) {
+function SelectInput({ value, onChange, children, className = "", ...props }) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-500"
+      className={`w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-500 ${className}`}
+      {...props}
     >
       {children}
     </select>
@@ -1145,36 +1147,58 @@ export default function App() {
                     <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
                       <BookOpen className="h-5 w-5" />
                     </div>
-                    <SelectInput value={translation} onChange={setTranslation}>
-                      {translations.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </SelectInput>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowChapterChooser((current) => !current)}
+                        className="flex min-w-44 shrink-0 items-center justify-between rounded-2xl border border-slate-300 bg-white px-4 py-3 text-left text-sm text-slate-900 transition hover:border-slate-400"
+                      >
+                        <span className="truncate">{activeReference}</span>
+                        <span className="ml-3 text-xs font-medium text-slate-500">
+                          {showChapterChooser ? "Close" : "Choose"}
+                        </span>
+                      </button>
+                      <PrimaryButton
+                        variant="outline"
+                        className="h-9 w-9 shrink-0 px-0"
+                        onClick={() => goToAdjacentChapter("prev")}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </PrimaryButton>
+                      <PrimaryButton
+                        variant="outline"
+                        className="h-9 w-9 shrink-0 px-0"
+                        onClick={() => goToAdjacentChapter("next")}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </PrimaryButton>
+                      <div className="relative shrink-0">
+                        <BookOpen className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                        <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-wide text-slate-900">
+                          {translation.toUpperCase()}
+                        </span>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                        <SelectInput
+                          value={translation}
+                          onChange={setTranslation}
+                          className="w-24 appearance-none pl-9 pr-9 text-center text-xs font-semibold uppercase tracking-wide text-transparent"
+                          aria-label="Choose Bible version"
+                          title={
+                            translations.find((item) => item.id === translation)?.label ||
+                            "Choose Bible version"
+                          }
+                        >
+                          {translations.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </SelectInput>
+                      </div>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-3 grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-                    <button
-                      type="button"
-                      onClick={() => setShowChapterChooser((current) => !current)}
-                      className="flex w-full items-center justify-between rounded-2xl border border-slate-300 bg-white px-4 py-3 text-left text-sm text-slate-900 transition hover:border-slate-400"
-                    >
-                      <span className="truncate">{activeReference}</span>
-                      <span className="ml-3 text-xs font-medium text-slate-500">
-                        {showChapterChooser ? "Close" : "Choose"}
-                      </span>
-                    </button>
-                    <PrimaryButton variant="outline" onClick={() => goToAdjacentChapter("prev")}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </PrimaryButton>
-                    <PrimaryButton variant="outline" onClick={() => goToAdjacentChapter("next")}>
-                      <ChevronRight className="h-4 w-4" />
-                    </PrimaryButton>
-                    
-                  </div>
-
                   {showChapterChooser ? (
                     <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                       <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
