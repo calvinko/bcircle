@@ -1095,35 +1095,39 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 p-2 lg:p-4 pb-28 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-6 w-6 text-slate-900" />
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div
+              className="flex items-center gap-2"
+              title="Read your assigned chapter, watch your progress, and manage your plan in profile."
+            >
+              <BookOpen className="h-6 w-6 shrink-0 text-slate-900" />
+              <h1 className="truncate text-3xl font-bold tracking-tight text-slate-900">
                 Bible Circle
               </h1>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
-              Read your assigned chapter, watch your progress, and manage your plan in profile.
-            </p>
           </div>
 
-          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+          <div className="flex shrink-0 items-center gap-2">
             <PrimaryButton
-              variant="outline"
+              type="button"
+              variant={showTodaysReading ? "solid" : "outline"}
               onClick={() => setShowTodaysReading((value) => !value)}
-              className="w-full md:w-auto"
+              className="h-11 w-11 px-0"
+              aria-label={showTodaysReading ? "Hide today's reading" : "Show today's reading"}
+              title={showTodaysReading ? "Hide today's reading" : "Show today's reading"}
             >
-              <ListChecks className="mr-2 h-4 w-4" />
-              {showTodaysReading ? "Hide today’s reading" : "Show today’s reading"}
+              <ListChecks className="h-4 w-4" />
             </PrimaryButton>
             <PrimaryButton
-              variant="outline"
+              type="button"
+              variant={showAdditionalReader ? "solid" : "outline"}
               onClick={() => setShowAdditionalReader((value) => !value)}
-              className="w-full md:w-auto"
+              className="h-11 w-11 px-0"
+              aria-label={showAdditionalReader ? "Hide comparison pane" : "Show comparison pane"}
+              title={showAdditionalReader ? "Hide comparison pane" : "Show comparison pane"}
             >
-              <BookOpen className="mr-2 h-4 w-4" />
-              {showAdditionalReader ? "Hide comparison pane" : "Show comparison pane"}
+              <BookOpen className="h-4 w-4" />
             </PrimaryButton>
           </div>
         </div>
@@ -1140,7 +1144,6 @@ export default function App() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
                       <BookOpen className="h-5 w-5" />
-                      Chapter reader
                     </div>
                     <SelectInput value={translation} onChange={setTranslation}>
                       {translations.map((item) => (
@@ -1330,7 +1333,6 @@ export default function App() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-xl font-semibold text-slate-900">
                         <BookOpen className="h-5 w-5" />
-                        Additional reading pane
                       </div>
                       <SelectInput value={additionalTranslation} onChange={setAdditionalTranslation}>
                         {translations.map((item) => (
