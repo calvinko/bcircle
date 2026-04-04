@@ -1405,7 +1405,7 @@ export default function App() {
                     </div>
                   ) : null}
 
-                  <div className="rounded-3xl border border-slate-200 bg-white p-2 lg:p-4">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-2 lg:mb-8 lg:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h2 className="text-xl font-semibold text-slate-900">{activeReference}</h2>
