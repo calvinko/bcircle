@@ -1153,7 +1153,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setShowChapterChooser((current) => !current)}
-                        className="flex min-w-44 shrink-0 items-center justify-between rounded-2xl border border-slate-300 bg-white px-4 py-3 text-left text-sm text-slate-900 transition hover:border-slate-400"
+                        className="flex lg:w-96 min-w-44 shrink-0 items-center justify-between rounded-2xl border border-slate-300 bg-white px-4 py-3 text-left text-sm text-slate-900 transition hover:border-slate-400"
                       >
                         <span className="truncate">{activeReference}</span>
                         <span className="ml-3 text-xs font-medium text-slate-500">
