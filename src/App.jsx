@@ -53,6 +53,7 @@ const translations = [
   { id: "asv", label: "American Standard Version (ASV)" },
   { id: "bbe", label: "Bible in Basic English (BBE)" },
   { id: "cuv", label: "Chinese Union Version (CUV)" },
+  { id: "net", label: "New English Translation (NET)" },
 ];
 
 function makeInitialProgress() {
@@ -331,22 +332,44 @@ function parseReference(reference) {
 async function fetchChapter(reference, translation) {
   const parsed = parseReference(reference);
   if (!parsed) throw new Error("Invalid chapter reference.");
-
-  if (translation === "CUV"){
-    return "haha";
-  } else {
-    const url = `https://bible-api.com/data/${translation}/${parsed.bookId}/${parsed.chapter}`;
+  // Special-case NET: fetch from labs.bible.org API which provides verse-level JSON
+  if (translation === "net") {
+    const passage = `${parsed.bookName} ${parsed.chapter}`;
+    const url = `https://labs.bible.org/api/?passage=${encodeURIComponent(passage)}&type=json&version=NET`;
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Failed to load chapter (${response.status}).`);
+      throw new Error(`Failed to load NET chapter (${response.status}).`);
     }
     const data = await response.json();
+    // labs.bible.org returns an array of {bookname,chapter,verse,text}
+    const verses = Array.isArray(data)
+      ? data.map((v) => ({
+          // keep shape compatible with existing verse rendering
+          book_id: parsed.bookId,
+          book_name: v.bookname || parsed.bookName,
+          chapter: Number(v.chapter),
+          verse: Number(v.verse),
+          text: v.text || "",
+        }))
+      : [];
 
     return {
-      translationName: data?.translation?.name || translation.toUpperCase(),
-      verses: Array.isArray(data?.verses) ? data.verses : [],
+      translationName: "NET",
+      verses,
     };
   }
+
+  const url = `https://bible-api.com/data/${translation}/${parsed.bookId}/${parsed.chapter}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load chapter (${response.status}).`);
+  }
+  const data = await response.json();
+
+  return {
+    translationName: data?.translation?.name || translation.toUpperCase(),
+    verses: Array.isArray(data?.verses) ? data.verses : [],
+  };
   
 }
 
