@@ -137,7 +137,7 @@ async function fetchEsvPassageText(book, chapter) {
     'include-first-verse-numbers': 'true',
     'include-verse-numbers': 'true',
     'include-footnotes': 'false',
-    'include-headings': 'true',
+    'include-headings': 'false',
     'include-short-copyright': 'false',
     'include-copyright': 'false'
   });
@@ -154,16 +154,41 @@ async function fetchEsvPassageText(book, chapter) {
 
   const data = await response.json();
   const passages = Array.isArray(data?.passages) ? data.passages : [];
+  const rows = passages.flatMap((text) => {
+    const normalized = String(text || '')
+      .replace(/\r/g, '')
+      .replace(/\n+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!normalized) {
+      return [];
+    }
+
+    const verseMatches = Array.from(normalized.matchAll(/\[(\d+)\]\s*/g));
+
+    if (verseMatches.length === 0) {
+      return [{ verse: 1, text: normalized }];
+    }
+
+    return verseMatches.map((match, index) => {
+      const verse = Number(match[1]);
+      const start = match.index + match[0].length;
+      const end = index + 1 < verseMatches.length ? verseMatches[index + 1].index : normalized.length;
+
+      return {
+        verse,
+        text: normalized.slice(start, end).trim()
+      };
+    });
+  });
 
   return {
     translationName: 'ESV',
     bookname: book,
     chapter: String(chapter),
     title: passage,
-    rows: passages.map((text, index) => ({
-      verse: index + 1,
-      text
-    }))
+    rows
   };
 }
 
