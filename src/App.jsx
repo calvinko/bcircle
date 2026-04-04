@@ -50,6 +50,7 @@ const DEFAULT_PROFILE = {
 const translations = [
   { id: "web", label: "World English Bible (WEB)" },
   { id: "kjv", label: "King James Version (KJV)" },
+  { id: "esv", label: "English Standard Version (ESV)" },
   { id: "asv", label: "American Standard Version (ASV)" },
   { id: "bbe", label: "Bible in Basic English (BBE)" },
   { id: "cuv", label: "Chinese Union Version (CUV)" },
@@ -319,11 +320,13 @@ function parseReference(reference) {
   const match = reference.match(/^(.*) (\d+)$/);
   if (!match) return null;
   const [, bookName, chapterStr] = match;
-  const book = bibleBooks.find((b) => b.name === bookName);
-  if (!book) return null;
+  const bookIndex = bibleBooks.findIndex((b) => b.name === bookName);
+  if (bookIndex === -1) return null;
+  const book = bibleBooks[bookIndex];
   return {
     bookName,
     bookId: book.id,
+    bookNumber: bookIndex + 1,
     chapter: Number(chapterStr),
     maxChapter: book.chapters,
   };
@@ -358,6 +361,20 @@ async function fetchChapter(reference, translation) {
       verses,
     };
   }
+
+  if (translation === "esv") {
+    const url = `${API_BASE}/bible/${encodeURIComponent(parsed.bookName)}/${parsed.chapter}?version=ESV`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load ESV chapter (${response.status}).`);
+    }
+    const data = await response.json();
+
+    return {
+      translationName: "ESV",
+      verses: Array.isArray(data?.rows) ? data.rows : [],
+    };
+  } 
 
   const url = `https://bible-api.com/data/${translation}/${parsed.bookId}/${parsed.chapter}`;
   const response = await fetch(url);
@@ -453,6 +470,34 @@ function ProgressBar({ value }) {
 }
 
 function ChapterTextContent({ loading, error, verses, fontSize }) {
+  const sanitizeHtml = (html) => {
+    if (typeof window === "undefined") return html;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+
+    doc.querySelectorAll("script, style, iframe, object, embed, form").forEach((node) => {
+      node.remove();
+    });
+
+    doc.querySelectorAll("*").forEach((node) => {
+      Array.from(node.attributes).forEach((attribute) => {
+        const name = attribute.name.toLowerCase();
+        const value = attribute.value.trim().toLowerCase();
+
+        if (name.startsWith("on")) {
+          node.removeAttribute(attribute.name);
+        }
+
+        if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
+          node.removeAttribute(attribute.name);
+        }
+      });
+    });
+
+    return doc.body.innerHTML;
+  };
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -466,6 +511,20 @@ function ChapterTextContent({ loading, error, verses, fontSize }) {
 
   if (error) {
     return <div className="text-sm text-red-600">{error}</div>;
+  }
+
+  const htmlVerse = verses.find(
+    (verse) => verse.verse === "htmltext" && typeof verse.text === "string"
+  );
+
+  if (htmlVerse) {
+    return (
+      <div
+        className="text-slate-700"
+        style={{ fontSize: `${fontSize}px`, lineHeight: 1.6 }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlVerse.text) }}
+      />
+    );
   }
 
   return (
