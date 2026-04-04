@@ -10,6 +10,7 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
+const ESV_AUTH_TOKEN = process.env.ESV_AUTH_TOKEN;
 const ALLOWED_ORIGINS = new Set([
   'https://biblecircle.vercel.app',
   'http://localhost:5173',
@@ -122,50 +123,6 @@ function normalizeProgress(progress = {}) {
   }
 
   return normalized;
-}
-
-async function fetchEsvPassageText(book, chapter) {
-  const token = process.env.ESV_AUTH_TOKEN;
-
-  if (!token) {
-    throw new Error('Missing ESV_AUTH_TOKEN');
-  }
-
-  const passage = `${book} ${chapter}`;
-  const params = new URLSearchParams({
-    q: passage,
-    'include-passage-references': 'false',
-    'include-first-verse-numbers': 'true',
-    'include-verse-numbers': 'true',
-    'include-footnotes': 'false',
-    'include-headings': 'true',
-    'include-short-copyright': 'false',
-    'include-copyright': 'false'
-  });
-
-  const response = await fetch(`https://api.esv.org/v3/passage/text/?${params.toString()}`, {
-    headers: {
-      Authorization: `Token ${token}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`ESV API request failed with status ${response.status}`);
-  }
-
-  const data = await response.json();
-  const passages = Array.isArray(data?.passages) ? data.passages : [];
-
-  return {
-    translationName: 'ESV',
-    bookname: book,
-    chapter: String(chapter),
-    title: passage,
-    rows: passages.map((text, index) => ({
-      verse: index + 1,
-      text
-    }))
-  };
 }
 
 async function ensureStoredUserDataTable() {
@@ -359,22 +316,6 @@ app.get('/api/health', async (_req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ ok: false });
-  }
-});
-
-app.get('/api/bible/:book/:chapter', async (req, res) => {
-  try {
-    const version = String(req.query.version || 'ESV').toUpperCase();
-
-    if (version !== 'ESV') {
-      return res.status(400).json({ error: 'Only ESV is supported by this endpoint.' });
-    }
-
-    const payload = await fetchEsvPassageText(req.params.book, req.params.chapter);
-    res.json(payload);
-  } catch (error) {
-    console.error('Fetch ESV passage failed:', error);
-    res.status(502).json({ error: 'Failed to fetch ESV passage.' });
   }
 });
 
