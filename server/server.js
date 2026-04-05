@@ -13,6 +13,7 @@ const PORT = Number(process.env.PORT || 3001);
 const ESV_AUTH_TOKEN = process.env.ESV_AUTH_TOKEN;
 const ALLOWED_ORIGINS = new Set([
   'https://biblecircle.vercel.app',
+  'https://app.biblecircle.org',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
