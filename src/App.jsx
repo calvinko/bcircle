@@ -48,13 +48,13 @@ const DEFAULT_PROFILE = {
 };
 
 const translations = [
-  { id: "web", label: "World English Bible (WEB)" },
-  { id: "kjv", label: "King James Version (KJV)" },
-  { id: "esv", label: "English Standard Version (ESV)" },
-  { id: "asv", label: "American Standard Version (ASV)" },
-  { id: "bbe", label: "Bible in Basic English (BBE)" },
-  { id: "cuv", label: "Chinese Union Version (CUV)" },
-  { id: "net", label: "New English Translation (NET)" },
+  { id: "web", label: "World English Bible" },
+  { id: "kjv", label: "King James Version" },
+  { id: "esv", label: "English Standard Version" },
+  { id: "asv", label: "American Standard Version" },
+  { id: "bbe", label: "Bible in Basic English" },
+  { id: "cuv", label: "Chinese Union Version" },
+  { id: "net", label: "New English Translation" },
 ];
 
 function makeInitialProgress() {
