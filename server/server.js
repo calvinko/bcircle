@@ -478,7 +478,7 @@ app.post('/api/auth/register', async (req, res) => {
         additional_translation,
         progress_json
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         userResult.insertId,
