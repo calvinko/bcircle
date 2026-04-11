@@ -1,4 +1,7 @@
+import express from 'express';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 
 export function signToken(user) {
   return jwt.sign(
@@ -35,4 +38,167 @@ export function requireAuth(req, res, next) {
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+}
+
+export function createAuthRouter({
+  pool,
+  ensureStoredUserDataTable,
+  defaultProfile,
+  defaultReadingPlan
+}) {
+  const router = express.Router();
+
+  router.post('/register', async (req, res) => {
+    await ensureStoredUserDataTable();
+    const connection = await pool.getConnection();
+
+    try {
+      const { email, password, displayName } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const passwordHash = await bcrypt.hash(password, 12);
+      const userUuid = randomUUID();
+
+      await connection.beginTransaction();
+
+      const [userResult] = await connection.execute(
+        `
+        INSERT INTO users (user_uuid, email, password_hash)
+        VALUES (?, ?, ?)
+        `,
+        [userUuid, normalizedEmail, passwordHash]
+      );
+
+      await connection.execute(
+        `
+        INSERT INTO user_profiles (user_id, display_name, avatar_url, timezone, bio)
+        VALUES (?, ?, NULL, NULL, NULL)
+        `,
+        [userResult.insertId, displayName ?? null]
+      );
+
+      await connection.execute(
+        `
+        INSERT INTO app_user_state_storage (
+          user_id,
+          name,
+          email,
+          goal,
+          selected_plan,
+          search,
+          days,
+          active_reference,
+          main_page,
+          translation,
+          reader_font_size,
+          show_additional_reader,
+          additional_translation,
+          progress_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          userResult.insertId,
+          displayName ?? defaultProfile.name,
+          normalizedEmail,
+          defaultProfile.goal,
+          defaultReadingPlan.selectedPlan,
+          defaultReadingPlan.search,
+          defaultReadingPlan.days,
+          defaultReadingPlan.activeReference,
+          defaultReadingPlan.mainPage,
+          defaultReadingPlan.translation,
+          defaultReadingPlan.readerFontSize,
+          defaultReadingPlan.showAdditionalReader,
+          defaultReadingPlan.additionalTranslation,
+          JSON.stringify({})
+        ]
+      );
+
+      await connection.commit();
+
+      const user = {
+        id: userResult.insertId,
+        user_uuid: userUuid,
+        email: normalizedEmail
+      };
+
+      const token = signToken(user);
+
+      res.status(201).json({
+        token,
+        user: {
+          userUuid: user.user_uuid,
+          email: user.email
+        }
+      });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Register failed:', error);
+
+      if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+
+      res.status(500).json({ error: 'Server error' });
+    } finally {
+      connection.release();
+    }
+  });
+
+  router.post('/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+      }
+
+      const normalizedEmail = String(email).trim().toLowerCase();
+
+      const [rows] = await pool.execute(
+        `
+        SELECT id, user_uuid, email, password_hash
+        FROM users
+        WHERE email = ?
+        LIMIT 1
+        `,
+        [normalizedEmail]
+      );
+
+      if (rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      const user = rows[0];
+      const ok = await bcrypt.compare(password, user.password_hash);
+
+      if (!ok) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      const token = signToken(user);
+
+      res.json({
+        token,
+        user: {
+          userUuid: user.user_uuid,
+          email: user.email
+        }
+      });
+    } catch (error) {
+      console.error('Login failed:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  return router;
 }

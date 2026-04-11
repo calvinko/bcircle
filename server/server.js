@@ -1,10 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import bcrypt from 'bcryptjs';
-import { randomUUID } from 'node:crypto';
 import { pool } from './db.js';
-import { requireAuth, signToken } from './auth.js';
+import { createAuthRouter, requireAuth } from './auth.js';
+import songPdfRouter from './songpdf.js';
 
 dotenv.config();
 
@@ -376,6 +375,16 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(
+  '/api/auth',
+  createAuthRouter({
+    pool,
+    ensureStoredUserDataTable,
+    defaultProfile: DEFAULT_PROFILE,
+    defaultReadingPlan: DEFAULT_READING_PLAN
+  })
+);
+app.use('/api/songpdf', songPdfRouter);
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -420,158 +429,6 @@ app.put('/api/user-profile', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Update stored user profile failed:', error);
     res.status(400).json({ error: 'Failed to save user data.' });
-  }
-});
-
-app.post('/api/auth/register', async (req, res) => {
-  await ensureStoredUserDataTable();
-  const connection = await pool.getConnection();
-
-  try {
-    const { email, password, displayName } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    }
-
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const passwordHash = await bcrypt.hash(password, 12);
-    const userUuid = randomUUID();
-
-    await connection.beginTransaction();
-
-    const [userResult] = await connection.execute(
-      `
-      INSERT INTO users (user_uuid, email, password_hash)
-      VALUES (?, ?, ?)
-      `,
-      [userUuid, normalizedEmail, passwordHash]
-    );
-
-    await connection.execute(
-      `
-      INSERT INTO user_profiles (user_id, display_name, avatar_url, timezone, bio)
-      VALUES (?, ?, NULL, NULL, NULL)
-      `,
-      [userResult.insertId, displayName ?? null]
-    );
-
-    await connection.execute(
-      `
-      INSERT INTO app_user_state_storage (
-        user_id,
-        name,
-        email,
-        goal,
-        selected_plan,
-        search,
-        days,
-        active_reference,
-        main_page,
-        translation,
-        reader_font_size,
-        show_additional_reader,
-        additional_translation,
-        progress_json
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        userResult.insertId,
-        displayName ?? DEFAULT_PROFILE.name,
-        normalizedEmail,
-        DEFAULT_PROFILE.goal,
-        DEFAULT_READING_PLAN.selectedPlan,
-        DEFAULT_READING_PLAN.search,
-        DEFAULT_READING_PLAN.days,
-        DEFAULT_READING_PLAN.activeReference,
-        DEFAULT_READING_PLAN.mainPage,
-        DEFAULT_READING_PLAN.translation,
-        DEFAULT_READING_PLAN.readerFontSize,
-        DEFAULT_READING_PLAN.showAdditionalReader,
-        DEFAULT_READING_PLAN.additionalTranslation,
-        JSON.stringify({})
-      ]
-    );
-
-    await connection.commit();
-
-    const user = {
-      id: userResult.insertId,
-      user_uuid: userUuid,
-      email: normalizedEmail
-    };
-
-    const token = signToken(user);
-
-    res.status(201).json({
-      token,
-      user: {
-        userUuid: user.user_uuid,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    await connection.rollback();
-    console.error('Register failed:', error);
-
-    if (error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ error: 'Email already registered' });
-    }
-
-    res.status(500).json({ error: 'Server error' });
-  } finally {
-    connection.release();
-  }
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    const normalizedEmail = String(email).trim().toLowerCase();
-
-    const [rows] = await pool.execute(
-      `
-      SELECT id, user_uuid, email, password_hash
-      FROM users
-      WHERE email = ?
-      LIMIT 1
-      `,
-      [normalizedEmail]
-    );
-
-    if (rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    const user = rows[0];
-    const ok = await bcrypt.compare(password, user.password_hash);
-
-    if (!ok) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-
-    const token = signToken(user);
-
-    res.json({
-      token,
-      user: {
-        userUuid: user.user_uuid,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    console.error('Login failed:', error);
-    res.status(500).json({ error: 'Server error' });
   }
 });
 
