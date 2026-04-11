@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { pool } from './db.js';
 import { createAuthRouter, requireAuth } from './auth.js';
+import { createChatGptRouter } from './chatgpt.js';
 import songPdfRouter from './songpdf.js';
 
 dotenv.config();
@@ -385,6 +386,7 @@ app.use(
   })
 );
 app.use('/api/songpdf', songPdfRouter);
+app.use('/api/chatgpt', requireAuth, createChatGptRouter());
 
 app.get('/api/health', async (_req, res) => {
   try {
