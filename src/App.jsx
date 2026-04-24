@@ -14,7 +14,7 @@ import {
   RefreshCw,
   ListTree,
 } from "lucide-react";
-import { bibleBooks } from "./bibleBooks";
+import { bibleBookMapEnToZh, bibleBooks } from "./bibleBooks";
 import LoginCard from "./login";
 
 const oldTestament = bibleBooks.slice(0, 39);
@@ -330,6 +330,17 @@ function parseReference(reference) {
     chapter: Number(chapterStr),
     maxChapter: book.chapters,
   };
+}
+
+function formatReferenceForTranslation(reference, selectedTranslation) {
+  const parsed = parseReference(reference);
+
+  if (!parsed || selectedTranslation !== "cuv") {
+    return reference;
+  }
+
+  const bookName = bibleBookMapEnToZh[parsed.bookName] || parsed.bookName;
+  return `${bookName} ${parsed.chapter}`;
 }
 
 async function fetchChapter(reference, translation) {
@@ -1441,7 +1452,9 @@ export default function App() {
                   <div className="rounded-3xl border border-slate-200 bg-white p-2 lg:mb-8 lg:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <h2 className="text-xl font-semibold text-slate-900">{activeReference}</h2>
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          {formatReferenceForTranslation(activeReference, translation)}
+                        </h2>
                         <p className="mt-1 text-sm text-slate-500">
                           {chapterData.translationName || "Loading translation..."}
                         </p>
@@ -1515,7 +1528,9 @@ export default function App() {
                     <div className="rounded-3xl border border-slate-200 bg-white p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <h2 className="text-xl font-semibold text-slate-900">{activeReference}</h2>
+                          <h2 className="text-xl font-semibold text-slate-900">
+                            {formatReferenceForTranslation(activeReference, additionalTranslation)}
+                          </h2>
                           <p className="mt-1 text-sm text-slate-500">
                             {additionalChapterData.translationName || "Loading translation..."}
                           </p>
