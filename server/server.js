@@ -288,7 +288,7 @@ async function fetchCuvPassageText(book, chapter) {
       verse,
       text
     FROM hb5text
-    WHERE UPPER(version) = 'CUV'
+    WHERE UPPER(version) = 'hb5'
       AND book = ?
       AND chapter = ?
     ORDER BY verse ASC
