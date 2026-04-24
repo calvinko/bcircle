@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 import { pool } from './db.js';
 import { createAuthRouter, requireAuth } from './auth.js';
 import { createChatGptRouter } from './chatgpt.js';
-import songPdfRouter from './songpdf.js';
 
 dotenv.config();
 
@@ -49,6 +48,79 @@ const DEFAULT_READING_PLAN = {
   showAdditionalReader: false,
   additionalTranslation: 'kjv'
 };
+
+const BIBLE_BOOK_NAMES = [
+  'Genesis',
+  'Exodus',
+  'Leviticus',
+  'Numbers',
+  'Deuteronomy',
+  'Joshua',
+  'Judges',
+  'Ruth',
+  '1 Samuel',
+  '2 Samuel',
+  '1 Kings',
+  '2 Kings',
+  '1 Chronicles',
+  '2 Chronicles',
+  'Ezra',
+  'Nehemiah',
+  'Esther',
+  'Job',
+  'Psalms',
+  'Proverbs',
+  'Ecclesiastes',
+  'Song of Solomon',
+  'Isaiah',
+  'Jeremiah',
+  'Lamentations',
+  'Ezekiel',
+  'Daniel',
+  'Hosea',
+  'Joel',
+  'Amos',
+  'Obadiah',
+  'Jonah',
+  'Micah',
+  'Nahum',
+  'Habakkuk',
+  'Zephaniah',
+  'Haggai',
+  'Zechariah',
+  'Malachi',
+  'Matthew',
+  'Mark',
+  'Luke',
+  'John',
+  'Acts',
+  'Romans',
+  '1 Corinthians',
+  '2 Corinthians',
+  'Galatians',
+  'Ephesians',
+  'Philippians',
+  'Colossians',
+  '1 Thessalonians',
+  '2 Thessalonians',
+  '1 Timothy',
+  '2 Timothy',
+  'Titus',
+  'Philemon',
+  'Hebrews',
+  'James',
+  '1 Peter',
+  '2 Peter',
+  '1 John',
+  '2 John',
+  '3 John',
+  'Jude',
+  'Revelation'
+];
+
+const BIBLE_BOOK_NUMBER_BY_NAME = new Map(
+  BIBLE_BOOK_NAMES.map((bookName, index) => [bookName.toLowerCase(), index + 1])
+);
 
 function normalizeProfile(profile = {}) {
   return {
@@ -190,6 +262,58 @@ async function fetchEsvPassageText(book, chapter) {
     chapter: String(chapter),
     title: passage,
     rows
+  };
+}
+
+function createHttpError(statusCode, message) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+async function fetchCuvPassageText(book, chapter) {
+  const bookNumber = BIBLE_BOOK_NUMBER_BY_NAME.get(String(book || '').toLowerCase());
+  const chapterNumber = Number(chapter);
+
+  if (!bookNumber || !Number.isInteger(chapterNumber) || chapterNumber < 1) {
+    throw createHttpError(400, 'Invalid Bible passage.');
+  }
+
+  const [rows] = await pool.execute(
+    `
+    SELECT
+      book,
+      bookname,
+      chapter,
+      verse,
+      text
+    FROM hb5text
+    WHERE UPPER(version) = 'CUV'
+      AND book = ?
+      AND chapter = ?
+    ORDER BY verse ASC
+    `,
+    [bookNumber, chapterNumber]
+  );
+
+  if (rows.length === 0) {
+    throw createHttpError(404, 'CUV passage not found.');
+  }
+
+  const bookname = rows[0].bookname || book;
+
+  return {
+    translationName: 'CUV',
+    bookname,
+    chapter: String(chapterNumber),
+    title: `${bookname} ${chapterNumber}`,
+    rows: rows.map((row) => ({
+      book_id: BIBLE_BOOK_NAMES[bookNumber - 1],
+      book_name: row.bookname || book,
+      chapter: Number(row.chapter),
+      verse: Number(row.verse),
+      text: row.text || ''
+    }))
   };
 }
 
@@ -385,7 +509,6 @@ app.use(
     defaultReadingPlan: DEFAULT_READING_PLAN
   })
 );
-app.use('/api/songpdf', songPdfRouter);
 app.use('/api/chatgpt', requireAuth, createChatGptRouter());
 
 app.get('/api/health', async (_req, res) => {
@@ -402,15 +525,23 @@ app.get('/api/bible/:book/:chapter', async (req, res) => {
   try {
     const version = String(req.query.version || 'ESV').toUpperCase();
 
-    if (version !== 'ESV') {
-      return res.status(400).json({ error: 'Only ESV is supported by this endpoint.' });
+    if (version === 'ESV') {
+      const payload = await fetchEsvPassageText(req.params.book, req.params.chapter);
+      res.json(payload);
+      return;
     }
 
-    const payload = await fetchEsvPassageText(req.params.book, req.params.chapter);
-    res.json(payload);
+    if (version === 'CUV') {
+      const payload = await fetchCuvPassageText(req.params.book, req.params.chapter);
+      res.json(payload);
+      return;
+    }
+
+    res.status(400).json({ error: 'Only ESV and CUV are supported by this endpoint.' });
   } catch (error) {
-    console.error('Fetch ESV passage failed:', error);
-    res.status(502).json({ error: 'Failed to fetch ESV passage.' });
+    const statusCode = Number(error.statusCode) || 502;
+    console.error('Fetch Bible passage failed:', error);
+    res.status(statusCode).json({ error: error.message || 'Failed to fetch Bible passage.' });
   }
 });
 

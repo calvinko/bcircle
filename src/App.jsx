@@ -376,6 +376,20 @@ async function fetchChapter(reference, translation) {
     };
   } 
 
+  if (translation === "cuv") {
+    const url = `${API_BASE}/bible/${encodeURIComponent(parsed.bookName)}/${parsed.chapter}?version=CUV`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to load CUV chapter (${response.status}).`);
+    }
+    const data = await response.json();
+
+    return {
+      translationName: "CUV",
+      verses: Array.isArray(data?.rows) ? data.rows : [],
+    };
+  }
+
   const url = `https://bible-api.com/data/${translation}/${parsed.bookId}/${parsed.chapter}`;
   const response = await fetch(url);
   if (!response.ok) {

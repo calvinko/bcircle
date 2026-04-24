@@ -54,3 +54,13 @@ CREATE TABLE IF NOT EXISTS app_user_state_storage (
     FOREIGN KEY (user_id) REFERENCES users(id)
     ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `hb5text` (
+  `version` varchar(32) NOT NULL,
+  `book` smallint(6) NOT NULL,
+  `bookname` varchar(32) NOT NULL,
+  `chapter` smallint(6) NOT NULL,
+  `verse` smallint(6) NOT NULL,
+  `text` varchar(256) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `flag` int(11) NOT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
