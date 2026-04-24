@@ -377,12 +377,31 @@ async function fetchChapter(reference, translation) {
   } 
 
   if (translation === "cuv") {
-    const url = `${API_BASE}/bible/${encodeURIComponent(parsed.bookName)}/${parsed.chapter}?version=CUV`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to load CUV chapter (${response.status}).`);
+    const publicUrl = `https://bible-api.com/data/${translation}/${parsed.bookId}/${parsed.chapter}`;
+
+    try {
+      const publicResponse = await fetch(publicUrl);
+      if (publicResponse.ok) {
+        const publicData = await publicResponse.json();
+        const publicVerses = Array.isArray(publicData?.verses) ? publicData.verses : [];
+
+        if (publicVerses.length > 0) {
+          return {
+            translationName: publicData?.translation?.name || "CUV",
+            verses: publicVerses,
+          };
+        }
+      }
+    } catch {
+      // Fall through to the backend CUV copy when the public API is unavailable or limited.
     }
-    const data = await response.json();
+
+    const fallbackUrl = `${API_BASE}/bible/${encodeURIComponent(parsed.bookName)}/${parsed.chapter}?version=CUV`;
+    const fallbackResponse = await fetch(fallbackUrl);
+    if (!fallbackResponse.ok) {
+      throw new Error(`Failed to load CUV chapter (${fallbackResponse.status}).`);
+    }
+    const data = await fallbackResponse.json();
 
     return {
       translationName: "CUV",
