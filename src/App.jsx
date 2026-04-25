@@ -14,7 +14,7 @@ import {
   RefreshCw,
   ListTree,
 } from "lucide-react";
-import { bibleBookMapEnToZh, bibleBooks } from "./bibleBooks";
+import { bibleBookMapEnToZhTraditional, bibleBooks } from "./bibleBooks";
 import LoginCard from "./login";
 
 const oldTestament = bibleBooks.slice(0, 39);
@@ -339,7 +339,7 @@ function formatReferenceForTranslation(reference, selectedTranslation) {
     return reference;
   }
 
-  const bookName = bibleBookMapEnToZh[parsed.bookName] || parsed.bookName;
+  const bookName = bibleBookMapEnToZhTraditional[parsed.bookName] || parsed.bookName;
   return `${bookName} ${parsed.chapter}`;
 }
 
