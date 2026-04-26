@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS = {
   translation: "web",
   readerFontSize: 15,
   showTodaysReading: false,
+  showDailyPlan: false,
   showAdditionalReader: false,
   additionalTranslation: "kjv",
 };
@@ -189,6 +190,10 @@ function normalizeSettings(settings = {}) {
       typeof settings.showTodaysReading === "boolean"
         ? settings.showTodaysReading
         : DEFAULT_SETTINGS.showTodaysReading,
+    showDailyPlan:
+      typeof settings.showDailyPlan === "boolean"
+        ? settings.showDailyPlan
+        : DEFAULT_SETTINGS.showDailyPlan,
     showAdditionalReader:
       typeof settings.showAdditionalReader === "boolean"
         ? settings.showAdditionalReader
@@ -201,9 +206,7 @@ function normalizeSettings(settings = {}) {
 }
 
 function getRemoteReadingPlan(settings = {}) {
-  const normalized = normalizeSettings(settings);
-  const { showTodaysReading: _showTodaysReading, ...remoteReadingPlan } = normalized;
-  return remoteReadingPlan;
+  return normalizeSettings(settings);
 }
 
 function normalizeProfile(profile = {}) {
@@ -635,6 +638,7 @@ export default function App() {
   const [showTodaysReading, setShowTodaysReading] = useState(
     loadedSettings.showTodaysReading ?? false
   );
+  const [showDailyPlan, setShowDailyPlan] = useState(loadedSettings.showDailyPlan ?? false);
   const [showAdditionalReader, setShowAdditionalReader] = useState(
     loadedSettings.showAdditionalReader ?? false
   );
@@ -663,10 +667,8 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [remoteReady, setRemoteReady] = useState(false);
   const [savedProfile, setSavedProfile] = useState(() => normalizeProfile(loadProfile()));
-  const [savedSettings, setSavedSettings] = useState(() => normalizeSettings(loadSettings()));
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPlan, setSavingPlan] = useState(false);
-  const [showDailyPlan, setShowDailyPlan] = useState(false);
   const [showChapterChooser, setShowChapterChooser] = useState(false);
   const [showTranslationChooser, setShowTranslationChooser] = useState(false);
   const [chapterChooserBook, setChapterChooserBook] = useState("");
@@ -687,6 +689,7 @@ export default function App() {
         translation,
         readerFontSize,
         showTodaysReading,
+        showDailyPlan,
         showAdditionalReader,
         additionalTranslation,
       }),
@@ -699,6 +702,7 @@ export default function App() {
       translation,
       readerFontSize,
       showTodaysReading,
+      showDailyPlan,
       showAdditionalReader,
       additionalTranslation,
     ]
@@ -752,7 +756,14 @@ export default function App() {
         const localSettings = loadSettings();
         const nextSettings = normalizeSettings({
           ...data.readingPlan,
-          showTodaysReading: localSettings.showTodaysReading,
+          showTodaysReading:
+            typeof data.readingPlan?.showTodaysReading === "boolean"
+              ? data.readingPlan.showTodaysReading
+              : localSettings.showTodaysReading,
+          showDailyPlan:
+            typeof data.readingPlan?.showDailyPlan === "boolean"
+              ? data.readingPlan.showDailyPlan
+              : localSettings.showDailyPlan,
         });
         const nextProfile = normalizeProfile(data.profile);
 
@@ -765,11 +776,11 @@ export default function App() {
         setTranslation(nextSettings.translation);
         setReaderFontSize(nextSettings.readerFontSize);
         setShowTodaysReading(nextSettings.showTodaysReading);
+        setShowDailyPlan(nextSettings.showDailyPlan);
         setShowAdditionalReader(nextSettings.showAdditionalReader);
         setAdditionalTranslation(nextSettings.additionalTranslation);
         setProfile(nextProfile);
         setSavedProfile(nextProfile);
-        setSavedSettings(nextSettings);
         setCurrentUser((prev) => prev || normalizeAuthUser({ email: nextProfile.email }));
         saveProgress(nextProgress);
         saveSettings(nextSettings);
@@ -812,7 +823,7 @@ export default function App() {
     const payload = {
       progress: normalizeProgress(progress),
       profile: savedProfile,
-      readingPlan: savedSettings,
+      readingPlan: settings,
     };
 
     const timeoutId = window.setTimeout(async () => {
@@ -838,7 +849,7 @@ export default function App() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [authToken, progress, savedProfile, savedSettings, remoteReady]);
+  }, [authToken, progress, savedProfile, settings, remoteReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -999,6 +1010,7 @@ export default function App() {
     setTranslation(DEFAULT_SETTINGS.translation);
     setReaderFontSize(DEFAULT_SETTINGS.readerFontSize);
     setShowTodaysReading(DEFAULT_SETTINGS.showTodaysReading);
+    setShowDailyPlan(DEFAULT_SETTINGS.showDailyPlan);
     setShowAdditionalReader(DEFAULT_SETTINGS.showAdditionalReader);
     setAdditionalTranslation(DEFAULT_SETTINGS.additionalTranslation);
     setProfile(DEFAULT_PROFILE);
@@ -1030,7 +1042,6 @@ export default function App() {
     setAuthError("");
     setAuthForm({ displayName: "", email: "", password: "" });
     setSavedProfile(DEFAULT_PROFILE);
-    setSavedSettings(DEFAULT_SETTINGS);
     resetGuestState();
     setSyncStatus({
       state: "offline",
@@ -1086,7 +1097,7 @@ export default function App() {
         {
           progress: normalizeProgress(progress),
           profile: nextProfile,
-          readingPlan: savedSettings,
+          readingPlan: settings,
         },
         authToken
       );
@@ -1117,7 +1128,6 @@ export default function App() {
     saveSettings(nextSettings);
 
     if (!authToken) {
-      setSavedSettings(nextSettings);
       setSyncStatus({
         state: "offline",
         message: "Reading plan saved on this device. Sign in to save it to your account.",
@@ -1136,7 +1146,6 @@ export default function App() {
         authToken
       );
       const normalizedSavedSettings = normalizeSettings(data.readingPlan);
-      setSavedSettings(normalizedSavedSettings);
       saveSettings(normalizedSavedSettings);
       setSyncStatus({
         state: "connected",
@@ -1173,7 +1182,6 @@ export default function App() {
     });
 
     setReaderFontSize(nextValue);
-    setSavedSettings(nextSettings);
     await persistReadingPlan(nextSettings, "Reader font size saved to your account.");
   };
 

@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS app_user_state_storage (
   translation VARCHAR(20) NULL,
   reader_font_size SMALLINT NULL,
   show_todays_reading BOOLEAN NULL,
+  show_daily_plan BOOLEAN NULL,
   show_additional_reader BOOLEAN NULL,
   additional_translation VARCHAR(20) NULL,
   progress_json JSON NULL,

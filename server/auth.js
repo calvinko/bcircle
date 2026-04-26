@@ -99,11 +99,13 @@ export function createAuthRouter({
           main_page,
           translation,
           reader_font_size,
+          show_todays_reading,
+          show_daily_plan,
           show_additional_reader,
           additional_translation,
           progress_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
           userResult.insertId,
@@ -117,6 +119,8 @@ export function createAuthRouter({
           defaultReadingPlan.mainPage,
           defaultReadingPlan.translation,
           defaultReadingPlan.readerFontSize,
+          defaultReadingPlan.showTodaysReading,
+          defaultReadingPlan.showDailyPlan,
           defaultReadingPlan.showAdditionalReader,
           defaultReadingPlan.additionalTranslation,
           JSON.stringify({})

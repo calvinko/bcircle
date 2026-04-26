@@ -45,6 +45,8 @@ const DEFAULT_READING_PLAN = {
   mainPage: 'reader',
   translation: 'web',
   readerFontSize: 15,
+  showTodaysReading: false,
+  showDailyPlan: false,
   showAdditionalReader: false,
   additionalTranslation: 'kjv'
 };
@@ -162,6 +164,14 @@ function normalizeReadingPlan(readingPlan = {}) {
       Number.isFinite(parsedReaderFontSize)
         ? Math.max(12, Math.min(24, parsedReaderFontSize))
         : DEFAULT_READING_PLAN.readerFontSize,
+    showTodaysReading:
+      typeof readingPlan.showTodaysReading === 'boolean'
+        ? readingPlan.showTodaysReading
+        : DEFAULT_READING_PLAN.showTodaysReading,
+    showDailyPlan:
+      typeof readingPlan.showDailyPlan === 'boolean'
+        ? readingPlan.showDailyPlan
+        : DEFAULT_READING_PLAN.showDailyPlan,
     showAdditionalReader:
       typeof readingPlan.showAdditionalReader === 'boolean'
         ? readingPlan.showAdditionalReader
@@ -333,6 +343,7 @@ async function ensureStoredUserDataTable() {
       translation VARCHAR(20) NULL,
       reader_font_size SMALLINT NULL,
       show_todays_reading BOOLEAN NULL,
+      show_daily_plan BOOLEAN NULL,
       show_additional_reader BOOLEAN NULL,
       additional_translation VARCHAR(20) NULL,
       progress_json JSON NULL,
@@ -345,6 +356,24 @@ async function ensureStoredUserDataTable() {
         ON DELETE CASCADE
     ) ENGINE=InnoDB
   `);
+
+  try {
+    await pool.execute(`
+      ALTER TABLE app_user_state_storage
+      ADD COLUMN show_todays_reading BOOLEAN NULL
+    `);
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+
+  try {
+    await pool.execute(`
+      ALTER TABLE app_user_state_storage
+      ADD COLUMN show_daily_plan BOOLEAN NULL
+    `);
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
 }
 
 async function readStoredUserData(userId, fallbackEmail = DEFAULT_PROFILE.email) {
@@ -364,6 +393,8 @@ async function readStoredUserData(userId, fallbackEmail = DEFAULT_PROFILE.email)
       main_page,
       translation,
       reader_font_size,
+      show_todays_reading,
+      show_daily_plan,
       show_additional_reader,
       additional_translation,
       progress_json,
@@ -403,7 +434,9 @@ async function readStoredUserData(userId, fallbackEmail = DEFAULT_PROFILE.email)
       mainPage: row.main_page,
       translation: row.translation,
       readerFontSize: row.reader_font_size,
-      showAdditionalReader: row.show_additional_reader,
+      showTodaysReading: Boolean(row.show_todays_reading),
+      showDailyPlan: Boolean(row.show_daily_plan),
+      showAdditionalReader: Boolean(row.show_additional_reader),
       additionalTranslation: row.additional_translation
     },
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at
@@ -435,11 +468,13 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       main_page,
       translation,
       reader_font_size,
+      show_todays_reading,
+      show_daily_plan,
       show_additional_reader,
       additional_translation,
       progress_json
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
       email = VALUES(email),
@@ -451,6 +486,8 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       main_page = VALUES(main_page),
       translation = VALUES(translation),
       reader_font_size = VALUES(reader_font_size),
+      show_todays_reading = VALUES(show_todays_reading),
+      show_daily_plan = VALUES(show_daily_plan),
       show_additional_reader = VALUES(show_additional_reader),
       additional_translation = VALUES(additional_translation),
       progress_json = VALUES(progress_json)
@@ -467,6 +504,8 @@ async function writeStoredUserData(userId, payload, fallbackEmail = DEFAULT_PROF
       normalized.readingPlan.mainPage,
       normalized.readingPlan.translation,
       normalized.readingPlan.readerFontSize,
+      normalized.readingPlan.showTodaysReading,
+      normalized.readingPlan.showDailyPlan,
       normalized.readingPlan.showAdditionalReader,
       normalized.readingPlan.additionalTranslation,
       JSON.stringify(normalized.progress)
