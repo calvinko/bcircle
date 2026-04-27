@@ -1689,7 +1689,7 @@ export default function App() {
                                     setActiveReference(`${book.name} ${index + 1}`);
                                     setMainPage("reader");
                                   }}
-                                  className="min-w-0 text-left text-slate-700 transition hover:text-slate-900"
+                                  className="min-w-0 flex-1 text-right text-slate-700 transition hover:text-slate-900"
                                 >
                                   {index + 1}
                                 </button>
