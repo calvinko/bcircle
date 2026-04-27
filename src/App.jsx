@@ -1671,7 +1671,7 @@ export default function App() {
                             {progress[book.name].map((isRead, index) => (
                               <div
                                 key={`${book.name}-${index + 1}`}
-                                className={`flex items-center gap-3 rounded-xl border px-1.5 py-1 text-xs transition hover:shadow-sm ${
+                                className={`flex items-center gap-4 rounded-xl border px-1.5 py-1 text-xs transition hover:shadow-sm ${
                                   isRead
                                     ? "border-slate-300 bg-slate-100"
                                     : "border-slate-200 bg-white"
